@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { MessageSquare, Activity, MousePointer2 } from "lucide-react";
-import { SimulationPanel } from "./SimulationPanel";
+import { MessageSquare, Compass, MousePointer2 } from "lucide-react";
+import { ExplorePanel } from "./ExplorePanel";
 import { ChatPanel } from "./ChatPanel";
 import type { ConceptNode, RelationshipEdge } from "@/types";
 
@@ -17,9 +17,7 @@ export function RightPanel({
   selectedEdge,
   onClose,
 }: RightPanelProps) {
-  const [activeTab, setActiveTab] = useState<"simulation" | "chat">(
-    "simulation",
-  );
+  const [activeTab, setActiveTab] = useState<"explore" | "chat">("explore");
 
   // Determine availability
   const canChat = !!selectedNode;
@@ -29,15 +27,15 @@ export function RightPanel({
       {/* Tabs */}
       <div className="flex border-b border-slate-700/50">
         <button
-          onClick={() => setActiveTab("simulation")}
+          onClick={() => setActiveTab("explore")}
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
-            activeTab === "simulation"
+            activeTab === "explore"
               ? "text-blue-400 bg-slate-800/50"
               : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
           }`}>
-          <Activity className="w-4 h-4" />
-          Simulation
-          {activeTab === "simulation" && (
+          <Compass className="w-4 h-4" />
+          Explore
+          {activeTab === "explore" && (
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />
           )}
         </button>
@@ -58,8 +56,9 @@ export function RightPanel({
 
       {/* Content */}
       <div className="flex-1 overflow-hidden p-0 bg-slate-900/30">
-        {activeTab === "simulation" ? (
-          <SimulationPanel
+        {activeTab === "explore" ? (
+          <ExplorePanel
+            documentId={documentId}
             selectedNode={selectedNode}
             selectedEdge={selectedEdge}
             onClose={onClose}

@@ -211,3 +211,43 @@ export async function getChatSession(chatId: string): Promise<{
   const response = await api.get(`/chat/${chatId}`);
   return response.data;
 }
+
+// ============ Quiz API ============
+
+export async function generateQuiz(
+  conceptId: string,
+  documentId: string,
+): Promise<{
+  id: string;
+  concept_id: string;
+  questions: Array<{
+    question: string;
+    options: string[];
+    correct_index: number;
+    explanation: string;
+  }>;
+}> {
+  const response = await api.post("/quiz/generate", {
+    concept_id: conceptId,
+    document_id: documentId,
+  });
+  return response.data;
+}
+
+export async function generateFlashcards(
+  conceptId: string,
+  documentId: string,
+): Promise<{
+  id: string;
+  concept_id: string;
+  cards: Array<{
+    front: string;
+    back: string;
+  }>;
+}> {
+  const response = await api.post("/quiz/flashcards/generate", {
+    concept_id: conceptId,
+    document_id: documentId,
+  });
+  return response.data;
+}
