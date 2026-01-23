@@ -176,3 +176,39 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
+
+# ============ Quiz Models ============
+
+class QuizQuestion(BaseModel):
+    question: str
+    options: list[str]
+    correct_index: int
+    explanation: str
+
+
+class Quiz(BaseModel):
+    id: str = Field(alias="_id")
+    concept_id: str
+    document_id: Optional[str] = None
+    questions: list[QuizQuestion]
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        populate_by_name = True
+
+# ============ Flashcard Models ============
+
+class Flashcard(BaseModel):
+    front: str  # Question or term
+    back: str   # Answer or definition
+
+
+class FlashcardSet(BaseModel):
+    id: str = Field(alias="_id")
+    concept_id: str
+    document_id: Optional[str] = None
+    cards: list[Flashcard]
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        populate_by_name = True

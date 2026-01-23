@@ -455,6 +455,162 @@ def generate_chat_title(text_content: str) -> str:
 
         title = completion.choices[0].message.content.strip().replace('"', '')
         return title
+
     except Exception as e:
         print(f"Title generation failed: {str(e)}")
         return "New Chat"
+
+
+QUIZ_GENERATION_PROMPT = """
+You are an expert educator and exam creator. Your task is to generate a challenging and educational multiple-choice quiz about specific concepts.
+
+You will be provided with:
+1. FOCUS CONCEPTS: The main topics to test.
+2. CONTEXT: Excerpts from a source document (if available).
+3. RELATIONSHIPS: Causal connections involving the concepts.
+
+Generation Rules:
+1. **Use Your Knowledge**: Do NOT limit yourself to the provided context. Use your own comprehensive knowledge about the concepts to create high-quality, accurate questions. The context is a starting point, but you should expand upon it.
+2. **Question Count**: Generate exactly 10 questions.
+3. **Difficulty**: Mix foundation questions with deeper conceptual questions that test understanding of causal relationships.
+4. **Format**: Valid JSON matching the schema.
+5. **Educational Value**: Each explanation should teach the user why the answer is correct and add extra context.
+
+Output Schema:
+{
+    "questions": [
+        {
+            "question": "The question text",
+            "options": ["Option A", "Option B", "Option C", "Option D"],
+            "correct_index": 0,
+            "explanation": "Detailed explanation of the correct answer."
+        }
+    ]
+}
+"""
+
+def generate_quiz(concept_label: str, context: str) -> Dict[str, Any]:
+    """
+    Generate a quiz for a specific concept using LLM knowledge + context.
+    """
+    global client
+    if not client and settings.groq_api_key:
+        client = Groq(api_key=settings.groq_api_key)
+
+    if not client:
+        # Fallback to mock if no client
+        return {
+            "questions": [
+                {
+                    "question": f"What is the primary characteristic of {concept_label}?",
+                    "options": ["Is blue", "Is fast", "Is complex", "Is fundamental"],
+                    "correct_index": 3,
+                    "explanation": f"This is a mock question about {concept_label}."
+                }
+            ] * 10
+        }
+
+    user_message = f"""Generate a 10-question quiz about: {concept_label}
+
+CONTEXT FROM DOCUMENT:
+{context}
+
+Remember to use your own knowledge to supplement this context and create a comprehensive quiz."""
+
+    print(f"Starting Quiz Generation for: {concept_label}")
+
+    try:
+        completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": QUIZ_GENERATION_PROMPT
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
+            ],
+            model="openai/gpt-oss-120b",
+            temperature=0.4,
+            response_format={"type": "json_object"}
+        )
+
+        response_content = completion.choices[0].message.content
+        result = json.loads(response_content)
+        return result
+
+
+    except Exception as e:
+        print(f"Quiz generation failed: {str(e)}")
+        # Return empty/mock on failure to avoid crashing
+        return {"questions": []}
+
+
+FLASHCARD_GENERATION_PROMPT = """
+You are an expert educator. Generate educational flashcards for studying a specific concept.
+
+Generation Rules:
+1. **Use Your Knowledge**: Use your comprehensive knowledge about the topic to create high-quality flashcards.
+2. **Card Count**: Generate exactly 12 flashcards.
+3. **Variety**: Mix different types of cards:
+   - Definitions
+   - Key facts
+   - Cause-effect relationships
+   - Examples
+4. **Format**: Front should be a clear question or term. Back should be a concise but complete answer.
+
+Output Schema:
+{
+    "cards": [
+        {
+            "front": "What is [term]?",
+            "back": "Concise definition or explanation"
+        }
+    ]
+}
+"""
+
+def generate_flashcards(concept_label: str, context: str) -> Dict[str, Any]:
+    """
+    Generate flashcards for a specific concept using LLM knowledge + context.
+    """
+    global client
+    if not client and settings.groq_api_key:
+        client = Groq(api_key=settings.groq_api_key)
+
+    if not client:
+        return {
+            "cards": [
+                {"front": f"What is {concept_label}?", "back": f"This is a mock flashcard about {concept_label}."}
+            ] * 12
+        }
+
+    user_message = f"""Generate 12 flashcards about: {concept_label}
+
+CONTEXT:
+{context}
+
+Use your own knowledge to supplement and create comprehensive flashcards.
+Return your response as a JSON object with a "cards" array."""
+
+    print(f"Starting Flashcard Generation for: {concept_label}")
+
+    try:
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": FLASHCARD_GENERATION_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            model="openai/gpt-oss-120b",
+            temperature=0.4,
+            response_format={"type": "json_object"}
+        )
+
+        response_content = completion.choices[0].message.content
+        result = json.loads(response_content)
+        return result
+
+    except Exception as e:
+        print(f"Flashcard generation failed: {str(e)}")
+        return {"cards": []}
