@@ -22,10 +22,16 @@ You must output ONLY valid JSON matching the specified schema.
 
 Extraction Rules:
 1. Identify key concepts (variables that can change, e.g., "temperature", "pressure", "price", "demand").
+   - EXTRACT AT LEAST 20 CONCEPTS to ensure a rich, detailed graph. 
+   - Dig deeper into sub-concepts if necessary to meet this count.
 2. Identify causal relationships where a change in one concept causes a change in another.
 3. Determine the relationship type: "direct" (both move same direction) or "inverse" (move opposite directions).
 4. Estimate a mathematical equation if possible, or provide a coefficient (positive for direct, negative for inverse).
 5. Extract specific sentences that contain the causal assertion.
+6. **CRITICAL**: Ensure the graph is FULLY CONNECTED. 
+   - Do not leave any isolated nodes. 
+   - If a concept seems disconnected, find a relationship to the main topic or another concept.
+   - All nodes must have at least one edge.
 
 Output Schema:
 {
