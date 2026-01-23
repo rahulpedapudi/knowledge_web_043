@@ -8,6 +8,12 @@ export interface ConceptNode {
   min_value?: number;
   max_value?: number;
   default_value?: number;
+  // 3D Graph properties
+  abstraction_level?: number; // 0-10: 0=concrete, 10=abstract (Z-axis)
+  depth_level?: number; // 0-3: 0=core (always visible), 3=detail (close zoom only)
+  category?: string; // semantic grouping for clustering
+  semantic_type?: "variable" | "law" | "process" | "entity";
+  parent_concepts?: string[]; // IDs of parent concepts for hierarchy
 }
 
 // ============ Relationship Types ============

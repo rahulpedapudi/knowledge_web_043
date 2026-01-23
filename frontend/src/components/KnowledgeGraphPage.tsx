@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { EnhancedConceptGraph } from "./EnhancedConceptGraph";
+import { ConceptGraph3D } from "./ConceptGraph3D";
 import { RightPanel } from "./RightPanel";
 import { getDocumentGraph } from "@/api/client";
 import { Loader2, MousePointer2 } from "lucide-react";
@@ -188,8 +188,8 @@ export function KnowledgeGraphPage({
             </div>
           </div>
         ) : graphData && visibleGraphData.concepts.length > 0 ? (
-          <EnhancedConceptGraph
-            graphData={visibleGraphData}
+          <ConceptGraph3D
+            graphData={graphData}
             onNodeSelect={handleNodeSelect}
             onNodeExpand={handleNodeExpand}
             onEdgeSelect={handleEdgeSelect}
