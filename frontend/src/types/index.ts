@@ -85,3 +85,30 @@ export interface D3Link {
   equation?: string;
   has_simulation: boolean;
 }
+
+// ============ User/Auth Types ============
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  created_at: string;
+  google_id?: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface SignupData {
+  email: string;
+  password: string;
+  name: string;
+}

@@ -2,6 +2,9 @@ import { useState, useCallback } from "react";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { ConceptGraph } from "@/components/ConceptGraph";
 import { SimulationPanel } from "@/components/SimulationPanel";
+import { AuthPage } from "@/components/AuthPage";
+import { GoogleCallback } from "@/components/GoogleCallback";
+import { useAuth } from "@/context/AuthContext";
 import { getDocumentGraph } from "@/api/client";
 import type {
   DocumentUploadResponse,
@@ -10,11 +13,13 @@ import type {
   D3Node,
   ConceptNode,
 } from "@/types";
-import { ArrowLeft, BookOpen, Network } from "lucide-react";
+import { ArrowLeft, BookOpen, Network, LogOut, User } from "lucide-react";
 
 type AppView = "upload" | "graph";
 
 function App() {
+  const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
+
   const [view, setView] = useState<AppView>("upload");
   const [, setDocumentId] = useState<string | null>(null);
   const [documentTitle, setDocumentTitle] = useState<string>("");
@@ -74,8 +79,45 @@ function App() {
     setStats(null);
   };
 
+  // Show loading spinner while checking auth
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-900">
+        <div className="w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Check if this is OAuth callback route
+  const isOAuthCallback = window.location.pathname === "/auth/callback";
+  if (isOAuthCallback) {
+    return <GoogleCallback />;
+  }
+
+  // Show auth page if not authenticated
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
   if (view === "upload") {
-    return <DocumentUpload onDocumentProcessed={handleDocumentProcessed} />;
+    return (
+      <div className="relative">
+        {/* User menu overlay */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/80 backdrop-blur-sm rounded-lg border border-slate-700/50">
+            <User className="w-4 h-4 text-blue-400" />
+            <span className="text-sm text-slate-300">{user?.name}</span>
+          </div>
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800/80 backdrop-blur-sm rounded-lg border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">
+            <LogOut className="w-4 h-4" />
+            <span className="text-sm">Logout</span>
+          </button>
+        </div>
+        <DocumentUpload onDocumentProcessed={handleDocumentProcessed} />
+      </div>
+    );
   }
 
   return (
@@ -111,6 +153,19 @@ function App() {
             <Network className="w-4 h-4 text-purple-400" />
             <span className="text-sm text-slate-300">Causal Graph</span>
           </div>
+
+          {/* User info */}
+          <div className="h-6 w-px bg-slate-700" />
+          <div className="flex items-center gap-2 px-3 py-1.5">
+            <User className="w-4 h-4 text-blue-400" />
+            <span className="text-sm text-slate-300">{user?.name}</span>
+          </div>
+          <button
+            onClick={logout}
+            className="flex items-center gap-1 px-2 py-1.5 text-slate-400 hover:text-white transition-colors"
+            title="Logout">
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
 

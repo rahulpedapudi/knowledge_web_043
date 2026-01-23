@@ -244,7 +244,7 @@ export function SimulationPanel({
             </div>
 
             {/* Output Display */}
-            <div className="p-6 bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl border border-slate-700/50 text-center">
+            <div className="p-6 bg-linear-to-br from-slate-900 to-slate-800 rounded-xl border border-slate-700/50 text-center">
               <label className="text-sm font-medium text-slate-400 block mb-2">
                 {config.target_concept.label}
               </label>
@@ -260,8 +260,8 @@ export function SimulationPanel({
                 <div
                   className={`h-full transition-all duration-300 ${
                     config.relationship_type === "direct"
-                      ? "bg-gradient-to-r from-blue-600 to-blue-400"
-                      : "bg-gradient-to-r from-orange-600 to-orange-400"
+                      ? "bg-linear-to-r from-blue-600 to-blue-400"
+                      : "bg-linear-to-r from-orange-600 to-orange-400"
                   }`}
                   style={{
                     width:

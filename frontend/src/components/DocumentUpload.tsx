@@ -81,11 +81,11 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="w-full max-w-2xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
+          <h1 className="text-4xl font-bold bg-linear-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
             GENZPULSE
           </h1>
           <p className="text-slate-400 text-lg">
@@ -132,7 +132,7 @@ Example: 'When temperature increases in a closed container, pressure also increa
               <Button
                 onClick={handlePasteSubmit}
                 disabled={isLoading || !textContent.trim()}
-                className="w-full py-6 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 border-0">
+                className="w-full py-6 text-lg bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 border-0">
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />

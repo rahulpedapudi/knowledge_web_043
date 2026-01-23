@@ -93,3 +93,69 @@ export async function calculateSimulation(
   });
   return response.data;
 }
+
+// ============ Auth API ============
+
+import type { AuthResponse, LoginCredentials, SignupData, User } from "@/types";
+
+const TOKEN_KEY = "genzpulse_token";
+
+export function getStoredToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setStoredToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function removeStoredToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+// Add auth header interceptor
+api.interceptors.request.use((config) => {
+  const token = getStoredToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export async function signup(data: SignupData): Promise<AuthResponse> {
+  const response = await api.post("/auth/signup", data);
+  const authData = response.data as AuthResponse;
+  setStoredToken(authData.access_token);
+  return authData;
+}
+
+export async function login(
+  credentials: LoginCredentials,
+): Promise<AuthResponse> {
+  const response = await api.post("/auth/login", credentials);
+  const authData = response.data as AuthResponse;
+  setStoredToken(authData.access_token);
+  return authData;
+}
+
+export async function getProfile(): Promise<User> {
+  const response = await api.get("/auth/profile");
+  return response.data;
+}
+
+export function logout(): void {
+  removeStoredToken();
+}
+
+// ============ Google OAuth API ============
+
+export async function getGoogleOAuthUrl(): Promise<string> {
+  const response = await api.get("/auth/google/login");
+  return response.data.url;
+}
+
+export async function handleGoogleCallback(token: string): Promise<User> {
+  // Token is already provided by backend redirect, just store it
+  setStoredToken(token);
+  // Fetch user profile with the token
+  return await getProfile();
+}
