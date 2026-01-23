@@ -22,7 +22,8 @@ app = FastAPI(
     title="Synapse API",
     description="Transform textbook content into interactive causal structures",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False  # Prevent 307 redirects for trailing slashes
 )
 
 # CORS
@@ -37,8 +38,10 @@ app.add_middleware(
 # Routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(google_oauth.router, prefix="/api/auth", tags=["OAuth"])
-app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
-app.include_router(simulations.router, prefix="/api/simulations", tags=["Simulations"])
+app.include_router(
+    documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(simulations.router,
+                   prefix="/api/simulations", tags=["Simulations"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 
 
