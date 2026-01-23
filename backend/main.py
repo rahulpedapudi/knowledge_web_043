@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from config import get_settings
 from database import connect_to_mongo, close_mongo_connection
-from routers import documents, simulations, auth, google_oauth
+from routers import documents, simulations, auth, google_oauth, chat
 
 settings = get_settings()
 
@@ -39,6 +39,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(google_oauth.router, prefix="/api/auth", tags=["OAuth"])
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(simulations.router, prefix="/api/simulations", tags=["Simulations"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 
 
 @app.get("/")

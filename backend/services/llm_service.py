@@ -140,3 +140,57 @@ def analyze_text_with_llm(sentences: List[str]) -> Dict[str, Any]:
         # Fallback to mock on error
         from services.mock_llm import analyze_text
         return analyze_text(sentences)
+
+
+def chat_with_context(context: str, message: str, history: List[Dict[str, str]] = None) -> str:
+    """
+    Chat with the LLM using provided context.
+    """
+    global client
+    if not client and settings.groq_api_key:
+        client = Groq(api_key=settings.groq_api_key)
+        
+    if not client:
+        return "Error: AI service not available. Please check API key configuration."
+
+    # Prepare messages
+    messages = [
+        {
+            "role": "system",
+            "content": f"""You are a helpful assistant analyzing a document. 
+            Use the following context to answer the user's question. 
+            If the answer is not in the context, say so politely.
+            Keep answers concise and relevant to the specific concept being discussed.
+            
+            Context:
+            {context}"""
+        }
+    ]
+    
+    # Add history
+    if history:
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+            
+    # Add current message
+    messages.append({"role": "user", "content": message})
+    
+    model_name = "openai/gpt-oss-120b"
+    
+    print(f"Starting Chat with context ({len(context)} chars) - Query: {message}")
+
+    try:
+        completion = client.chat.completions.create(
+            messages=messages,
+            model=model_name,
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        response = completion.choices[0].message.content
+        print(f"Chat Response: {response[:100]}...")
+        return response
+
+    except Exception as e:
+        print(f"Chat failed: {str(e)}")
+        return "I apologize, but I encountered an error determining the answer. Please try again."
