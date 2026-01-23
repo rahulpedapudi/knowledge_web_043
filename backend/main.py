@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="GENZPULSE API",
+    title="Synapse API",
     description="Transform textbook content into interactive causal structures",
     version="1.0.0",
     lifespan=lifespan
@@ -44,7 +44,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 
 @app.get("/")
 async def root():
-    return {"message": "GENZPULSE API - Interactive Causal Structure"}
+    return {"message": "Synapse API - Interactive Causal Structure"}
 
 
 @app.get("/health")
