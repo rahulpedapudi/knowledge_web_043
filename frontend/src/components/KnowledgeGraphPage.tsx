@@ -34,6 +34,7 @@ export function KnowledgeGraphPage({
   const [selectedEdge, setSelectedEdge] = useState<RelationshipEdge | null>(
     null,
   );
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string>>(new Set());
 
@@ -59,15 +60,18 @@ export function KnowledgeGraphPage({
   // Derive neighbors for the RightPanel
   const selectedNodeNeighbors = useMemo(() => {
     if (!selectedNode || !graphData) return [];
-    const neighbors: Array<{ node: ConceptNode; relationship: RelationshipEdge }> = [];
+    const neighbors: Array<{
+      node: ConceptNode;
+      relationship: RelationshipEdge;
+    }> = [];
 
-    graphData.relationships.forEach(r => {
+    graphData.relationships.forEach((r) => {
       let neighborId = null;
       if (r.source === selectedNode.id) neighborId = r.target;
       else if (r.target === selectedNode.id) neighborId = r.source;
 
       if (neighborId) {
-        const node = graphData.concepts.find(c => c.id === neighborId);
+        const node = graphData.concepts.find((c) => c.id === neighborId);
         if (node) {
           neighbors.push({ node, relationship: r });
         }
@@ -182,6 +186,12 @@ export function KnowledgeGraphPage({
     setSelectedNode(null);
   }, []);
 
+  // Click on background - deselect all
+  const handleBackgroundClick = useCallback(() => {
+    setSelectedNode(null);
+    setSelectedEdge(null);
+  }, []);
+
   const visibleGraphData = getVisibleGraphData();
 
   return (
@@ -216,6 +226,7 @@ export function KnowledgeGraphPage({
             onEdgeSelect={handleEdgeSelect}
             selectedNodeId={selectedNode?.id}
             selectedEdgeId={selectedEdge?.id}
+            onBackgroundClick={handleBackgroundClick}
           />
         ) : documentId ? (
           <div className="flex items-center justify-center h-full">
@@ -249,6 +260,8 @@ export function KnowledgeGraphPage({
         selectedNode={selectedNode}
         selectedEdge={selectedEdge}
         neighbors={selectedNodeNeighbors}
+        isCollapsed={rightPanelCollapsed}
+        onToggle={() => setRightPanelCollapsed(!rightPanelCollapsed)}
         onClose={() => {
           setSelectedNode(null);
           setSelectedEdge(null);

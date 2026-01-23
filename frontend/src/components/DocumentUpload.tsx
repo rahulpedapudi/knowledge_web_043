@@ -33,6 +33,37 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
   const [pendingText, setPendingText] = useState<string | null>(null);
   const [focusConcepts, setFocusConcepts] = useState("");
 
+  const handleProcess = async (
+    file?: File,
+    text?: string,
+    concepts: string[] = [],
+  ) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      let response: DocumentUploadResponse;
+
+      if (step === "topic-only" && concepts.length > 0) {
+        response = await generateFromTopic(concepts);
+      } else if (file) {
+        response = await uploadPdf(file, undefined, concepts);
+      } else if (text) {
+        response = await pasteText(text, undefined, concepts);
+      } else {
+        setError("No content to process.");
+        setIsLoading(false);
+        return;
+      }
+      onDocumentProcessed(response);
+    } catch (err) {
+      setError("Failed to process. Please try again.");
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleInputSubmit = async () => {
     if (!inputText.trim()) return;
 
@@ -42,10 +73,9 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     }
 
     setPendingText(inputText);
-    setPendingFile(null);
     setInputText("");
-    setStep("concepts");
-    setError(null);
+    // Skip concept step, proceed directly
+    await handleProcess(undefined, inputText);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -62,47 +92,20 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     }
 
     setPendingFile(file);
-    setPendingText(null);
-    setStep("concepts");
-    setError(null);
+    // Skip concept step, proceed directly
+    await handleProcess(file);
   };
 
-  const handleProcessWithConcepts = async () => {
-    setIsLoading(true);
-    setError(null);
+  const handleTopicOnlyProcess = async () => {
+    if (!focusConcepts.trim()) return;
 
+    setIsLoading(true);
     const concepts = focusConcepts
       .split(/[,\n]/)
       .map((c) => c.trim())
       .filter((c) => c.length > 0);
 
-    if (concepts.length === 0) {
-      setError("Please enter at least one concept.");
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      let response: DocumentUploadResponse;
-
-      if (step === "topic-only") {
-        response = await generateFromTopic(concepts);
-      } else if (pendingFile) {
-        response = await uploadPdf(pendingFile, undefined, concepts);
-      } else if (pendingText) {
-        response = await pasteText(pendingText, undefined, concepts);
-      } else {
-        setError("No content to process.");
-        setIsLoading(false);
-        return;
-      }
-      onDocumentProcessed(response);
-    } catch (err) {
-      setError("Failed to process. Please try again.");
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    await handleProcess(undefined, undefined, concepts);
   };
 
   const handleTopicOnlyMode = () => {
@@ -130,10 +133,8 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     }
   }, []);
 
-  // Step 2: Concepts Input Screen
-  if (step === "concepts" || step === "topic-only") {
-    const isTopicOnly = step === "topic-only";
-
+  // Step 2: Concepts Input Screen (Only for "Learn Any Topic" mode now)
+  if (step === "topic-only") {
     return (
       <div className="flex-1 flex flex-col h-full bg-[#212121]">
         <div className="flex items-center justify-between px-4 py-3">
@@ -148,28 +149,15 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
         <div className="flex-1 flex flex-col items-center justify-center p-4 max-w-2xl mx-auto w-full relative">
           <div className="mb-8 text-center">
             <div className="mb-4 inline-flex justify-center">
-              <div
-                className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                  isTopicOnly
-                    ? "bg-linear-to-br from-blue-500 to-cyan-500"
-                    : "bg-linear-to-br from-purple-500 to-pink-500"
-                }`}>
-                {isTopicOnly ? (
-                  <BookOpen className="w-7 h-7 text-white" />
-                ) : (
-                  <FileText className="w-7 h-7 text-white" />
-                )}
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-linear-to-br from-blue-500 to-cyan-500">
+                <BookOpen className="w-7 h-7 text-white" />
               </div>
             </div>
             <h2 className="text-2xl font-medium text-white mb-2">
-              {isTopicOnly
-                ? "Learn Any Topic"
-                : pendingFile?.name || "Your Content"}
+              Learn Any Topic
             </h2>
             <p className="text-white/50 text-sm">
-              {isTopicOnly
-                ? "Enter the topics you want to explore and learn about"
-                : "What concepts do you want to learn from this document?"}
+              Enter the topics you want to explore and learn about
             </p>
           </div>
 
@@ -177,23 +165,18 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
             <div className="bg-[#2f2f2f] rounded-2xl p-5 shadow-lg border border-white/5">
               <label className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-yellow-400" />
-                {isTopicOnly ? "Topics to Learn" : "Focus Concepts"}
+                Topics to Learn
               </label>
               <textarea
                 value={focusConcepts}
                 onChange={(e) => setFocusConcepts(e.target.value)}
-                placeholder={
-                  isTopicOnly
-                    ? "Enter topics you want to learn, separated by commas or new lines.\n\nExample:\nMachine Learning, Neural Networks\nDeep Learning\nBackpropagation"
-                    : "Enter the concepts you want to learn, separated by commas or new lines.\n\nExample:\nPhotosynthesis, Chlorophyll\nLight Reactions\nCalvin Cycle"
-                }
+                placeholder="Enter topics you want to learn, separated by commas or new lines.\n\nExample:\nMachine Learning, Neural Networks\nDeep Learning\nBackpropagation"
                 className="w-full bg-[#212121] border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-white/40 resize-none focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all"
                 rows={6}
               />
               <p className="text-xs text-white/40 mt-2">
-                {isTopicOnly
-                  ? "AI will generate a comprehensive knowledge graph about these topics."
-                  : "The knowledge graph will focus on these concepts and their relationships."}
+                AI will generate a comprehensive knowledge graph about these
+                topics.
               </p>
             </div>
           </div>
@@ -205,24 +188,18 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
               Back
             </button>
             <button
-              onClick={handleProcessWithConcepts}
+              onClick={handleTopicOnlyProcess}
               disabled={isLoading || !focusConcepts.trim()}
-              className={`flex-1 py-3 px-4 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 ${
-                isTopicOnly
-                  ? "bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500"
-                  : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
-              }`}>
+              className="flex-1 py-3 px-4 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500">
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {isTopicOnly ? "Generating..." : "Processing..."}
+                  Generating...
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  {isTopicOnly
-                    ? "Generate Knowledge Graph"
-                    : "Build Knowledge Graph"}
+                  Generate Knowledge Graph
                 </>
               )}
             </button>
@@ -241,22 +218,6 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
   // Step 1: Upload Screen
   return (
     <div className="flex-1 flex flex-col h-full bg-transparent overflow-y-auto">
-      <nav className="relative z-20 flex items-center justify-between px-8 py-6 shrink-0">
-        <div className="flex items-center gap-2 group cursor-pointer">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-white/10 flex items-center justify-center group-hover:border-white/20 transition-all">
-            <div className="w-3 h-3 rounded-full bg-white/70 shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
-          </div>
-          <span className="font-semibold text-lg tracking-tight text-white/90">
-            Synapse 5.2
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer">
-            <span className="text-sm font-medium text-white/60">K</span>
-          </div>
-        </div>
-      </nav>
-
       <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 max-w-4xl mx-auto w-full">
         <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-purple-300 mb-6 backdrop-blur-md">
@@ -370,14 +331,7 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
                   )}
                 </button>
               ) : (
-                <>
-                  <button className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all">
-                    <Mic className="w-5 h-5" />
-                  </button>
-                  <button className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all">
-                    <Headphones className="w-5 h-5" />
-                  </button>
-                </>
+                <></>
               )}
             </div>
           </div>

@@ -72,7 +72,7 @@ export function FlashcardDialog({
 
   if (loading) {
     return createPortal(
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
         <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
           <div className="w-16 h-16 mx-auto mb-6 relative">
             <div className="absolute inset-0 rounded-full border-4 border-slate-800" />
@@ -92,7 +92,7 @@ export function FlashcardDialog({
 
   if (error) {
     return createPortal(
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
         <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-md text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">Error</h3>
@@ -111,7 +111,7 @@ export function FlashcardDialog({
   const currentCard = cards[currentIndex];
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
       <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-6 border-b border-slate-700/50 bg-slate-800/30 flex items-center justify-between">

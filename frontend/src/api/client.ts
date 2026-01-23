@@ -16,6 +16,10 @@ const api = axios.create({
   },
 });
 
+export async function deleteChat(chatId: string): Promise<void> {
+  await api.delete(`/chat/${chatId}`);
+}
+
 // ============ Documents API ============
 
 export async function uploadPdf(
@@ -29,7 +33,11 @@ export async function uploadPdf(
     formData.append("title", title);
   }
   if (focusConcepts && focusConcepts.length > 0) {
-    formData.append("focus_concepts", JSON.stringify(focusConcepts));
+    if (typeof focusConcepts === "string") {
+      formData.append("focus_concepts", focusConcepts);
+    } else {
+      formData.append("focus_concepts", JSON.stringify(focusConcepts));
+    }
   }
 
   const response = await api.post("/documents/upload", formData, {
@@ -51,7 +59,11 @@ export async function pasteText(
     formData.append("title", title);
   }
   if (focusConcepts && focusConcepts.length > 0) {
-    formData.append("focus_concepts", JSON.stringify(focusConcepts));
+    if (typeof focusConcepts === "string") {
+      formData.append("focus_concepts", focusConcepts);
+    } else {
+      formData.append("focus_concepts", JSON.stringify(focusConcepts));
+    }
   }
 
   const response = await api.post("/documents/paste", formData, {

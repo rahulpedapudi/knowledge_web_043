@@ -3,12 +3,10 @@ import {
   MessageSquare,
   Compass,
   MousePointer2,
-  Info,
-  Share2,
-  Activity,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { ExplorePanel } from "./ExplorePanel";
-import { SimulationPanel } from "./SimulationPanel";
 import { ChatPanel } from "./ChatPanel";
 import type { ConceptNode, RelationshipEdge } from "@/types";
 
@@ -17,6 +15,8 @@ interface RightPanelProps {
   selectedNode: ConceptNode | null;
   selectedEdge: RelationshipEdge | null;
   neighbors?: Array<{ node: ConceptNode; relationship: RelationshipEdge }>;
+  isCollapsed?: boolean;
+  onToggle?: () => void;
   onClose: () => void;
 }
 
@@ -25,37 +25,76 @@ export function RightPanel({
   selectedNode,
   selectedEdge,
   neighbors = [],
+  isCollapsed = false,
+  onToggle,
   onClose,
 }: RightPanelProps) {
-  const [activeTab, setActiveTab] = useState<"details" | "explore" | "chat">(
-    "details",
-  );
+  const [activeTab, setActiveTab] = useState<"explore" | "chat">("explore");
 
   const canChat = !!selectedNode;
 
+  // Collapsed state
+  if (isCollapsed) {
+    return (
+      <div className="w-[60px] shrink-0 flex flex-col h-full bg-[#13131f]/40 backdrop-blur-xl border-l border-white/5 shadow-2xl transition-all duration-300">
+        <div className="p-2">
+          <button
+            onClick={onToggle}
+            className="w-full p-2 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            title="Expand panel">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col items-center py-4 gap-2">
+          <button
+            onClick={() => {
+              onToggle?.();
+              setActiveTab("explore");
+            }}
+            className={`w-full p-2 flex items-center justify-center rounded-lg transition-colors ${
+              activeTab === "explore"
+                ? "text-blue-400 bg-white/10"
+                : "text-white/50 hover:text-white hover:bg-white/10"
+            }`}
+            title="Explore">
+            <Compass className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => {
+              onToggle?.();
+              setActiveTab("chat");
+            }}
+            className={`w-full p-2 flex items-center justify-center rounded-lg transition-colors ${
+              activeTab === "chat"
+                ? "text-emerald-400 bg-white/10"
+                : "text-white/50 hover:text-white hover:bg-white/10"
+            }`}
+            title="Chat">
+            <MessageSquare className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded state
   return (
-    <div className="w-[400px] shrink-0 flex flex-col h-full border-l border-slate-700/50 bg-slate-900/50 backdrop-blur-sm">
+    <div className="w-[400px] shrink-0 flex flex-col h-full bg-[#13131f]/40 backdrop-blur-xl border-l border-white/5 shadow-2xl transition-all duration-300">
       {/* Tabs */}
-      <div className="flex border-b border-slate-700/50">
+      <div className="flex border-b border-white/10 shrink-0">
         <button
-          onClick={() => setActiveTab("details")}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
-            activeTab === "details"
-              ? "text-purple-400 bg-slate-800/50"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
-          }`}>
-          <Info className="w-4 h-4" />
-          Details
-          {activeTab === "details" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-400" />
-          )}
+          onClick={onToggle}
+          className="p-3 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+          title="Collapse panel">
+          <ChevronRight className="w-4 h-4" />
         </button>
         <button
           onClick={() => setActiveTab("explore")}
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
             activeTab === "explore"
-              ? "text-blue-400 bg-slate-800/50"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+              ? "text-blue-400"
+              : "text-white/60 hover:text-white hover:bg-white/5"
           }`}>
           <Compass className="w-4 h-4" />
           Explore
@@ -67,8 +106,8 @@ export function RightPanel({
           onClick={() => setActiveTab("chat")}
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
             activeTab === "chat"
-              ? "text-emerald-400 bg-slate-800/50"
-              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
+              ? "text-emerald-400"
+              : "text-white/60 hover:text-white hover:bg-white/5"
           }`}>
           <MessageSquare className="w-4 h-4" />
           Chat
@@ -79,133 +118,29 @@ export function RightPanel({
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-0 bg-slate-900/30 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-        {activeTab === "details" && (
-          <div className="p-6 space-y-6">
-            {selectedNode ? (
-              <>
-                {/* Header */}
-                <div>
-                  <div className="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-2">
-                    Selected Concept
-                  </div>
-                  <h2 className="text-2xl font-bold text-white mb-2">
-                    {selectedNode.label}
-                  </h2>
-                  {selectedNode.description && (
-                    <p className="text-slate-300 text-sm leading-relaxed border-l-2 border-purple-500/30 pl-3">
-                      {selectedNode.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Metadata */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-slate-800/50 p-3 rounded-lg border border-white/5">
-                    <div className="text-xs text-slate-500 mb-1">Type</div>
-                    <div className="text-sm font-mono text-blue-300">
-                      {selectedNode.semantic_type || "Entity"}
-                    </div>
-                  </div>
-                  {selectedNode.unit && (
-                    <div className="bg-slate-800/50 p-3 rounded-lg border border-white/5">
-                      <div className="text-xs text-slate-500 mb-1">Unit</div>
-                      <div className="text-sm font-mono text-emerald-300">
-                        {selectedNode.unit}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Relationships */}
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-400 mb-3 border-b border-white/5 pb-2">
-                    <Share2 className="w-4 h-4" />
-                    Connected to
-                  </div>
-
-                  {neighbors.length > 0 ? (
-                    <div className="space-y-2">
-                      {neighbors.map(({ node, relationship }) => (
-                        <div
-                          key={node.id}
-                          className="group flex items-start gap-3 p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800/60 border border-white/5 transition-all">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center shrink-0">
-                            <Activity className="w-4 h-4 text-slate-400" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-slate-200 text-sm">
-                              {node.label}
-                            </div>
-                            <div className="text-xs text-slate-500 mt-0.5">
-                              {relationship.description}
-                            </div>
-                            {relationship.equation && (
-                              <div className="mt-1.5 text-[10px] bg-black/30 px-2 py-1 rounded border border-white/5 font-mono text-slate-400 inline-block">
-                                {relationship.equation}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-slate-600 italic text-center py-4">
-                      No direct connections visible
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : selectedEdge ? (
-              <div>
-                <div className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-2">
-                  Selected Relationship
-                </div>
-                <p className="text-lg text-white mb-4">
-                  {selectedEdge.description}
-                </p>
-                {selectedEdge.equation && (
-                  <div className="bg-black/40 p-4 rounded-xl border border-blue-500/20 mb-4">
-                    <div className="text-xs text-blue-400/70 mb-1 font-mono">
-                      Equation
-                    </div>
-                    <code className="text-blue-300 font-mono text-lg">
-                      {selectedEdge.equation}
-                    </code>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                <Info className="w-12 h-12 text-slate-700 mb-4" />
-                <p className="text-slate-400 max-w-[200px]">
-                  Select a node or edge to view its details here.
-                </p>
-              </div>
-            )}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+        {activeTab === "explore" ? (
+          <div className="flex-1 overflow-y-auto">
+            <ExplorePanel
+              documentId={documentId}
+              selectedNode={selectedNode}
+              selectedEdge={selectedEdge}
+              neighbors={neighbors}
+              onClose={onClose}
+            />
           </div>
-        )}
-
-        {activeTab === "explore" && (
-          <ExplorePanel
-            documentId={documentId}
-            selectedNode={selectedNode}
-            selectedEdge={selectedEdge}
-            onClose={onClose}
-          />
-        )}
-
-        {activeTab === "chat" && (
-          <div className="h-full">
+        ) : (
+          <div className="flex-1 flex flex-col min-h-0">
             {canChat && documentId && selectedNode ? (
               <ChatPanel
+                key={selectedNode.id}
                 documentId={documentId}
                 conceptId={selectedNode.id}
                 conceptLabel={selectedNode.label}
               />
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
-                <MousePointer2 className="w-12 h-12 text-slate-700 mb-4" />
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-white/40">
+                <MousePointer2 className="w-12 h-12 text-white/20 mb-4" />
                 <p>Select a concept to start chatting</p>
               </div>
             )}

@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, Bot, User as UserIcon } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  Bot,
+  User as UserIcon,
+  MessageSquare,
+} from "lucide-react";
 import { sendChatMessage } from "@/api/client";
 
 interface ChatPanelProps {
@@ -78,12 +84,12 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
-      <div className="p-4 border-b border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
-        <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-          <Bot className="w-4 h-4 text-blue-400" />
-          Chat about:{" "}
+      <div className="p-4 border-b border-white/10">
+        <h3 className="text-sm font-medium text-white/80 flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-emerald-400" />
+          Chat about{" "}
           <span className="text-white font-semibold">{conceptLabel}</span>
         </h3>
       </div>
@@ -91,11 +97,12 @@ export function ChatPanel({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
-          <div className="text-center text-slate-500 text-sm py-8 px-4">
+          <div className="text-center text-white/40 text-sm py-8 px-4">
             <p className="mb-2">
-              Ask questions about <strong>{conceptLabel}</strong>.
+              Ask questions about{" "}
+              <strong className="text-white/60">{conceptLabel}</strong>.
             </p>
-            <p className="text-xs">
+            <p className="text-xs text-white/30">
               I'll use relevant text from the document to answer.
             </p>
           </div>
@@ -122,7 +129,7 @@ export function ChatPanel({
               className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
                 msg.role === "user"
                   ? "bg-blue-600 text-white rounded-tr-none"
-                  : "bg-slate-700 text-slate-200 rounded-tl-none"
+                  : "bg-white/10 text-white/90 rounded-tl-none border border-white/5"
               }`}>
               {msg.content}
             </div>
@@ -134,7 +141,7 @@ export function ChatPanel({
             <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
               <Bot className="w-4 h-4 text-white" />
             </div>
-            <div className="bg-slate-700 rounded-2xl rounded-tl-none px-4 py-3 text-slate-300">
+            <div className="bg-white/10 rounded-2xl rounded-tl-none px-4 py-3 text-white/60 border border-white/5">
               <Loader2 className="w-4 h-4 animate-spin" />
             </div>
           </div>
@@ -144,19 +151,19 @@ export function ChatPanel({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-slate-700/50 bg-slate-800/80 backdrop-blur-sm">
+      <div className="p-4 border-t border-white/10">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your question..."
-            className="flex-1 bg-slate-900/50 border border-slate-600/50 rounded-xl px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all"
+            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all"
           />
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="p-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            className="p-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             <Send className="w-4 h-4" />
           </button>
         </form>

@@ -44,6 +44,7 @@ interface ConceptGraph3DProps {
   onEdgeSelect: (edge: D3Link) => void;
   selectedNodeId?: string | null;
   selectedEdgeId?: string | null;
+  onBackgroundClick?: () => void;
 }
 
 // ============ Helpers ============
@@ -119,7 +120,7 @@ function ConnectionLine({
         color={isActive ? "#ffffff" : color}
         lineWidth={isActive ? 3 : 1}
         transparent
-        opacity={isActive ? 0.9 : 0.3}
+        opacity={isActive ? 0.9 : 0.6}
         onPointerOver={(e) => {
           e.stopPropagation();
           onHover();
@@ -353,6 +354,7 @@ export function ConceptGraph3D({
   onEdgeSelect,
   selectedNodeId,
   selectedEdgeId,
+  onBackgroundClick,
 }: ConceptGraph3DProps) {
   // Orbital Layout Algorithm
   const { nodes3D, edges3D } = useMemo(() => {
@@ -411,7 +413,7 @@ export function ConceptGraph3D({
           0,
           Math.sin(angle) * innerRadius,
         ],
-        color: "#1e293b",
+        color: "#1f293b",
         size: 1,
         side: "left",
         variant: "dark",
@@ -446,7 +448,12 @@ export function ConceptGraph3D({
 
   return (
     <div className="w-full h-full relative bg-transparent">
-      <Canvas camera={{ position: [0, 30, 45], fov: 45 }}>
+      <Canvas
+        camera={{ position: [0, 30, 45], fov: 45 }}
+        onPointerMissed={(e) => {
+          // Deselect on background click
+          if (onBackgroundClick) onBackgroundClick();
+        }}>
         <fog attach="fog" args={["#050510", 40, 150]} />
         <ambientLight intensity={0.5} />
         <pointLight position={[0, 20, 0]} intensity={2} color="#ffffff" />
