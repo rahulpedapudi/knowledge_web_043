@@ -44,40 +44,104 @@ async def chat_message(request: ChatRequest):
     
     concept_label = concept["label"]
     
-    # 2. Find relevant chunks (Context Retrieval)
-    # Strategy: Find chunks in this document that contain the concept label (case-insensitive)
-    # This is a simple but effective "retrieval" without a vector DB
+    # 2. Get Relationship Context (Incoming and Outgoing)
+    cursor = db.relationships.find({
+        "$or": [
+            {"source_concept_id": request.concept_id},
+            {"target_concept_id": request.concept_id}
+        ]
+    })
+    
+    relationships = []
+    async for rel in cursor:
+        relationships.append(rel)
+        
+    # Get labels for related concepts
+    related_concept_ids = set()
+    for rel in relationships:
+        related_concept_ids.add(rel["source_concept_id"])
+        related_concept_ids.add(rel["target_concept_id"])
+    
+    related_concepts = {}
+    if related_concept_ids:
+        rc_cursor = db.concepts.find({"_id": {"$in": [ObjectId(cid) for cid in related_concept_ids]}})
+        async for rc in rc_cursor:
+            related_concepts[str(rc["_id"])] = rc["label"]
+
+    # 3. Construct Structured Context
+    structured_context = []
+    
+    # Section: Concept Profile
+    structured_context.append(f"### Concept Profile: {concept_label}")
+    if concept.get("description"):
+        structured_context.append(f"Description: {concept['description']}")
+    if concept.get("unit"):
+        structured_context.append(f"Unit: {concept['unit']}")
+    
+    val_str = []
+    if concept.get("min_value") is not None: val_str.append(f"Min: {concept['min_value']}")
+    if concept.get("max_value") is not None: val_str.append(f"Max: {concept['max_value']}")
+    if val_str:
+        structured_context.append(f"Range: {', '.join(val_str)}")
+
+    # Section: Causal Relationships
+    structured_context.append(f"\n### Causal Relationships for {concept_label}")
+    
+    has_relations = False
+    for rel in relationships:
+        # Outgoing
+        if rel["source_concept_id"] == request.concept_id:
+            target_name = related_concepts.get(rel["target_concept_id"], "Unknown")
+            rel_desc = f"- AFFECTS {target_name} ({rel['relationship_type']})"
+            if rel.get("description"):
+                rel_desc += f": {rel['description']}"
+            structured_context.append(rel_desc)
+            has_relations = True
+            
+        # Incoming
+        elif rel["target_concept_id"] == request.concept_id:
+            source_name = related_concepts.get(rel["source_concept_id"], "Unknown")
+            rel_desc = f"- AFFECTED BY {source_name} ({rel['relationship_type']})"
+            if rel.get("description"):
+                rel_desc += f": {rel['description']}"
+            structured_context.append(rel_desc)
+            has_relations = True
+            
+    if not has_relations:
+        structured_context.append("No direct causal relationships defined.")
+
+    # 4. Find relevant chunks (Textual Context)
+    structured_context.append(f"\n### Source Document Excerpts for {concept_label}")
+    
     chunks_cursor = db.chunks.find({
         "document_id": request.document_id,
         "text": {"$regex": re.escape(concept_label), "$options": "i"}
-    }).limit(10)  # Limit to 10 most relevant chunks
+    }).limit(10)
     
-    relevant_chunks = []
+    text_chunks = []
     async for chunk in chunks_cursor:
-        relevant_chunks.append(chunk["text"])
-    
-    if not relevant_chunks:
-        # Fallback: if no specific mentions found (rare if concept was extracted), 
-        # maybe just grab the chunks marked as causal? or just tell the user.
-        # Let's try to get adjacent chunks or just warn.
-        # For now, let's grab causal chunks as a broader context fallback
+        text_chunks.append(chunk["text"])
+        
+    if not text_chunks:
+        # Fallback to general causal chunks
         fallback_cursor = db.chunks.find({
             "document_id": request.document_id,
             "is_causal": True
         }).limit(5)
         async for chunk in fallback_cursor:
-            relevant_chunks.append(chunk["text"])
-            
-    # Deduplicate chunks
-    relevant_chunks = list(set(relevant_chunks))
+            text_chunks.append(chunk["text"])
     
-    # 3. Construct Context String
-    context_str = "\n---\n".join(relevant_chunks)
-    
-    if not context_str:
-        context_str = "No specific text found for this concept."
+    # Deduplicate and add
+    added_chunks = set()
+    for chunk in text_chunks:
+        if chunk not in added_chunks:
+            structured_context.append(f"- {chunk}")
+            added_chunks.add(chunk)
+
+    # Final Context String
+    context_str = "\n".join(structured_context)
         
-    # 4. Call LLM
+    # 5. Call LLM
     response = chat_with_context(
         context=context_str,
         message=request.message,
@@ -86,5 +150,41 @@ async def chat_message(request: ChatRequest):
     
     return ChatResponse(
         response=response,
-        context_used=relevant_chunks
+        context_used=list(added_chunks) if added_chunks else ["Generated from Graph Structure"]
     )
+
+@router.get("/history")
+async def get_chat_history():
+    """Get list of recent chat sessions (linked to documents)."""
+    db = get_database()
+    cursor = db.chats.find().sort("created_at", -1).limit(50)
+    
+    chats = []
+    async for chat in cursor:
+        chats.append({
+            "id": str(chat["_id"]),
+            "title": chat.get("title", "Untitled Chat"),
+            "document_id": chat.get("document_id"),
+            "created_at": chat.get("created_at")
+        })
+    return chats
+
+@router.get("/{chat_id}")
+async def get_chat_session(chat_id: str):
+    """Get chat session details including linked document ID."""
+    db = get_database()
+    try:
+        chat = await db.chats.find_one({"_id": ObjectId(chat_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid chat ID")
+        
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+        
+    return {
+        "id": str(chat["_id"]),
+        "title": chat.get("title", "Untitled Chat"),
+        "document_id": chat.get("document_id"),
+        "created_at": chat.get("created_at"),
+        "messages": chat.get("messages", [])
+    }

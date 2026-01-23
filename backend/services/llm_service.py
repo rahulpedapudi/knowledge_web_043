@@ -194,3 +194,41 @@ def chat_with_context(context: str, message: str, history: List[Dict[str, str]] 
     except Exception as e:
         print(f"Chat failed: {str(e)}")
         return "I apologize, but I encountered an error determining the answer. Please try again."
+
+
+def generate_chat_title(text_content: str) -> str:
+    """
+    Generate a short, concise 3-5 word title for a chat based on the document content or query.
+    """
+    global client
+    if not client and settings.groq_api_key:
+        client = Groq(api_key=settings.groq_api_key)
+        
+    if not client:
+        return "New Chat"
+
+    # Truncate content for title generation
+    preview_text = text_content[:1000]
+
+    try:
+        completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant. Generate a very short, concise 3-5 word title for a chat that discusses the following text. Do not use quotes. Return ONLY the title."
+                },
+                {
+                    "role": "user",
+                    "content": f"Text: {preview_text}"
+                }
+            ],
+            model="openai/gpt-oss-120b",
+            temperature=0.5,
+            max_tokens=20
+        )
+        
+        title = completion.choices[0].message.content.strip().replace('"', '')
+        return title
+    except Exception as e:
+        print(f"Title generation failed: {str(e)}")
+        return "New Chat"

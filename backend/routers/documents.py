@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from typing import Optional
 from bson import ObjectId
 from io import BytesIO
+from datetime import datetime
 
 from database import get_database
 from models import (
@@ -11,7 +12,7 @@ from models import (
     GraphData
 )
 from services.pdf_extractor import extract_sentences_from_pdf, extract_sentences_from_text
-from services.llm_service import analyze_text_with_llm
+from services.llm_service import analyze_text_with_llm, generate_chat_title
 from services.mock_llm import DEMO_TEXT
 
 router = APIRouter()
@@ -105,9 +106,24 @@ async def upload_pdf(
         {"_id": ObjectId(doc_id)},
         {"$set": {"processed": True}}
     )
+
+    # Generate title for chat
+    chat_title = generate_chat_title(raw_text)
+    if not chat_title or not chat_title.strip():
+        chat_title = doc_data["title"] or "New Chat"
+    
+    # Create chat session linked to this document
+    chat_data = {
+        "document_id": doc_id,
+        "title": chat_title,
+        "created_at": datetime.utcnow(),
+        "messages": []
+    }
+    chat_result = await db.chats.insert_one(chat_data)
     
     return {
         "document_id": doc_id,
+        "chat_id": str(chat_result.inserted_id),
         "title": doc_data["title"],
         "total_sentences": analysis["total_sentences"],
         "causal_sentences": analysis["causal_count"],
@@ -195,9 +211,24 @@ async def paste_text(
         {"_id": ObjectId(doc_id)},
         {"$set": {"processed": True}}
     )
+
+    # Generate title for chat
+    chat_title = generate_chat_title(text)
+    if not chat_title or not chat_title.strip():
+        chat_title = doc_data["title"] or "New Chat"
+
+    # Create chat session linked to this document
+    chat_data = {
+        "document_id": doc_id,
+        "title": chat_title,
+        "created_at": datetime.utcnow(),
+        "messages": []
+    }
+    chat_result = await db.chats.insert_one(chat_data)
     
     return {
         "document_id": doc_id,
+        "chat_id": str(chat_result.inserted_id),
         "title": doc_data["title"],
         "total_sentences": analysis["total_sentences"],
         "causal_sentences": analysis["causal_count"],
@@ -225,7 +256,7 @@ async def create_demo():
     doc_id = str(result.inserted_id)
     
     # Analyze
-    analysis = analyze_text(sentences)
+    analysis = analyze_text_with_llm(sentences)  # Changed from analyze_text to use LLM service if available
     
     # Store chunks
     for i, sentence in enumerate(sentences):
@@ -270,9 +301,19 @@ async def create_demo():
         {"$set": {"processed": True}}
     )
     
-    return {
+    # Create chat session linked to this document
+    chat_data = {
         "document_id": doc_id,
         "title": "Physics & Economics Demo",
+        "created_at": datetime.utcnow(),
+        "messages": []
+    }
+    chat_result = await db.chats.insert_one(chat_data)
+    
+    return {
+        "document_id": doc_id,
+        "chat_id": str(chat_result.inserted_id),
+        "title": doc_data["title"],
         "concepts_extracted": len(analysis["concepts"]),
         "relationships_found": len(analysis["relationships"])
     }
