@@ -1,0 +1,46 @@
+# Python
+# virtual environment
+.venv/
+env/
+venv/
+
+# Byte-code files
+*.pyc
+__pycache__/
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# Environment variables
+.env
+.flaskenv
+
+# Editor/IDE-specific files
+.vscode/ # Uncomment if you want to ignore all VS Code settings
+.idea/
+
+# Node and React
+# Dependencies
+/node_modules
+
+# Build artifacts
+/build
+/dist
+/out
+.cache
+coverage
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Optional: if you use yarn, keep the lock file, otherwise ignore it
+# yarn.lock
+# package-lock.json (should generally be committed to version control)
