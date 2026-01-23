@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Text, Line } from "@react-three/drei";
 import * as THREE from "three";
+import * as d3 from "d3";
 import type { GraphData, ConceptNode, D3Link } from "@/types";
 
 // ============ Types ============
@@ -24,20 +25,20 @@ interface ConceptGraph3DProps {
 // ============ Color & Size Constants ============
 
 const DEPTH_COLORS = [
-  "#f5c842", // Depth 0: Gold - Core concepts
-  "#60a5fa", // Depth 1: Blue - Primary
-  "#a78bfa", // Depth 2: Purple - Secondary
-  "#34d399", // Depth 3: Green - Detail
+  "#ffd700", // Depth 0: Gold - Core concepts (Brighter)
+  "#3b82f6", // Depth 1: Blue - Primary (Brighter)
+  "#a855f7", // Depth 2: Purple - Secondary (Brighter)
+  "#22c55e", // Depth 3: Green - Detail (Brighter)
 ];
 
-const DEPTH_SIZES = [0.5, 0.35, 0.25, 0.18]; // Larger = more important
+const DEPTH_SIZES = [0.8, 0.6, 0.4, 0.3]; // Significantly larger sizes
 
 // Zoom thresholds for each depth level
 const LOD_THRESHOLDS = {
   0: Infinity, // Always visible
-  1: 18, // Visible when camera distance < 18
-  2: 12, // Visible when camera distance < 12
-  3: 7, // Visible when camera distance < 7
+  1: 25, // Visible when camera distance < 25 (Increased)
+  2: 18, // Visible when camera distance < 18 (Increased)
+  3: 10, // Visible when camera distance < 10 (Increased)
 };
 
 // ============ Node Component ============
@@ -86,15 +87,7 @@ function NodeMesh({
         onPointerOver={() => isVisible && setHovered(true)}
         onPointerOut={() => setHovered(false)}>
         <sphereGeometry args={[node.size, 32, 32]} />
-        <meshStandardMaterial
-          color={node.color}
-          emissive={node.color}
-          emissiveIntensity={isSelected ? 0.6 : hovered ? 0.4 : 0.2}
-          metalness={0.2}
-          roughness={0.5}
-          transparent
-          opacity={opacity}
-        />
+        <meshBasicMaterial color={node.color} transparent opacity={opacity} />
       </mesh>
 
       {/* Glow effect */}
@@ -355,107 +348,57 @@ export function ConceptGraph3D({
   const [controlMode, setControlMode] = useState<"rotate" | "pan">("rotate");
   const [zoomDelta, setZoomDelta] = useState(0);
 
-  // Convert graph data to 3D positions with LOD
+  // Convert graph data to 3D positions with LOD using d3-force
   const { nodes3D, edges3D } = useMemo(() => {
-    // Group concepts by parent for hierarchical clustering
-    const parentGroups = new Map<string, ConceptNode[]>();
-    const rootNodes: ConceptNode[] = [];
+    // 1. Prepare data for simulation
+    const simulationNodes = graphData.concepts.map((c) => ({
+      ...c,
+      x: 0,
+      y: 0,
+    }));
 
-    graphData.concepts.forEach((concept) => {
-      const parents = concept.parent_concepts || [];
-      if (parents.length === 0) {
-        rootNodes.push(concept);
-      } else {
-        parents.forEach((parentId) => {
-          if (!parentGroups.has(parentId)) {
-            parentGroups.set(parentId, []);
-          }
-          parentGroups.get(parentId)!.push(concept);
-        });
-      }
-    });
+    const simulationLinks = graphData.relationships.map((r) => ({
+      source: r.source,
+      target: r.target,
+    }));
 
-    // Position nodes in 3D space
-    const nodes: Node3D[] = [];
-    const positioned = new Set<string>();
+    // 2. Run simulation synchronously
+    // We run it "instantly" instead of animating it for stability in 3D
+    const simulation = d3
+      .forceSimulation(simulationNodes as any)
+      .force(
+        "link",
+        d3
+          .forceLink(simulationLinks)
+          .id((d: any) => d.id)
+          .distance(2), // Tighter connections for 3D
+      )
+      .force("charge", d3.forceManyBody().strength(-15)) // Less repulsion for tighter clusters
+      .force("center", d3.forceCenter(0, 0))
+      .force("collision", d3.forceCollide().radius(1.5))
+      .stop();
 
-    // Position root/core nodes first (depth 0)
-    const coreNodes = graphData.concepts.filter(
-      (c) => (c.depth_level ?? 0) === 0,
-    );
-    const angleStep = (Math.PI * 2) / Math.max(coreNodes.length, 1);
+    // Run ticks manually to settle the graph
+    for (let i = 0; i < 300; ++i) simulation.tick();
 
-    coreNodes.forEach((concept, i) => {
-      const angle = i * angleStep;
-      const radius = 3;
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius;
+    // 3. Map 2D simulation (x, y) to 3D (x, z) + Abstraction Level (y)
+    const nodes: Node3D[] = simulationNodes.map((node: any) => {
+      const depthLevel = node.depth_level ?? 0;
 
       // Y based on abstraction (higher = more abstract)
-      const abstraction = concept.abstraction_level ?? 5;
-      const y = (abstraction / 10) * 6 - 2;
+      const abstraction = node.abstraction_level ?? 5;
+      const yPosition = (abstraction / 10) * 8 - 4; // Range from -4 to 4
 
-      const depthLevel = concept.depth_level ?? 0;
-
-      nodes.push({
-        ...concept,
-        position: [x, y, z],
-        color: DEPTH_COLORS[depthLevel] || DEPTH_COLORS[0],
-        size: DEPTH_SIZES[depthLevel] || DEPTH_SIZES[0],
-      });
-      positioned.add(concept.id);
-    });
-
-    // Position remaining nodes based on their depth and relationships
-    const remainingNodes = graphData.concepts.filter(
-      (c) => !positioned.has(c.id),
-    );
-
-    remainingNodes.forEach((concept) => {
-      const depthLevel = concept.depth_level ?? 1;
-      const parents = concept.parent_concepts || [];
-
-      // Find parent position to cluster near
-      let baseX = 0,
-        baseY = 0,
-        baseZ = 0;
-      let parentCount = 0;
-
-      parents.forEach((parentId) => {
-        const parentNode = nodes.find((n) => n.id === parentId);
-        if (parentNode) {
-          baseX += parentNode.position[0];
-          baseY += parentNode.position[1];
-          baseZ += parentNode.position[2];
-          parentCount++;
-        }
-      });
-
-      if (parentCount > 0) {
-        baseX /= parentCount;
-        baseY /= parentCount;
-        baseZ /= parentCount;
-      }
-
-      // Add offset based on depth level (deeper = further out)
-      const offsetRadius = 1.5 + depthLevel * 0.8;
-      const offsetAngle = Math.random() * Math.PI * 2;
-      const x = baseX + Math.cos(offsetAngle) * offsetRadius;
-      const z = baseZ + Math.sin(offsetAngle) * offsetRadius;
-
-      // Y based on abstraction
-      const abstraction = concept.abstraction_level ?? 5;
-      const y = (abstraction / 10) * 6 - 2;
-
-      nodes.push({
-        ...concept,
-        position: [x, y, z],
+      return {
+        ...node,
+        // Map simulation X/Y to 3D X/Z
+        position: [node.x, yPosition, node.y], // node.y from d3 maps to Z depth
         color: DEPTH_COLORS[depthLevel] || DEPTH_COLORS[3],
         size: DEPTH_SIZES[depthLevel] || DEPTH_SIZES[3],
-      });
+      };
     });
 
-    // Create edges with IDs
+    // 4. Create edges
     const edges = graphData.relationships.map((rel, i) => ({
       id: `edge-${rel.source}-${rel.target}-${i}`,
       source: rel.source,

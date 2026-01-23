@@ -21,11 +21,15 @@ const api = axios.create({
 export async function uploadPdf(
   file: File,
   title?: string,
+  focusConcepts?: string[],
 ): Promise<DocumentUploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
   if (title) {
     formData.append("title", title);
+  }
+  if (focusConcepts && focusConcepts.length > 0) {
+    formData.append("focus_concepts", JSON.stringify(focusConcepts));
   }
 
   const response = await api.post("/documents/upload", formData, {
@@ -39,11 +43,15 @@ export async function uploadPdf(
 export async function pasteText(
   text: string,
   title?: string,
+  focusConcepts?: string[],
 ): Promise<DocumentUploadResponse> {
   const formData = new FormData();
   formData.append("text", text);
   if (title) {
     formData.append("title", title);
+  }
+  if (focusConcepts && focusConcepts.length > 0) {
+    formData.append("focus_concepts", JSON.stringify(focusConcepts));
   }
 
   const response = await api.post("/documents/paste", formData, {
@@ -56,6 +64,15 @@ export async function pasteText(
 
 export async function createDemo(): Promise<DocumentUploadResponse> {
   const response = await api.post("/documents/demo");
+  return response.data;
+}
+
+export async function generateFromTopic(
+  topics: string[],
+): Promise<DocumentUploadResponse> {
+  const response = await api.post("/documents/generate", {
+    topics,
+  });
   return response.data;
 }
 
@@ -184,9 +201,7 @@ export async function getChatHistory(): Promise<
   return response.data;
 }
 
-export async function getChatSession(
-  chatId: string,
-): Promise<{
+export async function getChatSession(chatId: string): Promise<{
   id: string;
   title: string;
   document_id: string;

@@ -72,15 +72,16 @@ function App() {
     );
   }
 
-  if (!user) {
-    return <AuthPage />;
-  }
-
-  // Check for Google Callback
+  // Check for Google Callback FIRST (before auth check)
+  // This handles the OAuth redirect with token
   const searchParams = new URLSearchParams(window.location.search);
   const token = searchParams.get("token");
-  if (token) {
+  if (token || location.pathname === "/auth/callback") {
     return <GoogleCallback />;
+  }
+
+  if (!user) {
+    return <AuthPage />;
   }
 
   return (
