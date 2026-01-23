@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-
 import {
   Upload,
   Loader2,
@@ -11,6 +10,7 @@ import {
   X,
   Sparkles,
   BookOpen,
+  Command,
 } from "lucide-react";
 import { uploadPdf, pasteText, generateFromTopic } from "@/api/client";
 import type { DocumentUploadResponse } from "@/types";
@@ -41,7 +41,6 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
       return;
     }
 
-    // Move to concepts step instead of processing immediately
     setPendingText(inputText);
     setPendingFile(null);
     setInputText("");
@@ -62,7 +61,6 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
       return;
     }
 
-    // Move to concepts step instead of processing immediately
     setPendingFile(file);
     setPendingText(null);
     setStep("concepts");
@@ -73,7 +71,6 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     setIsLoading(true);
     setError(null);
 
-    // Parse focus concepts (comma or newline separated)
     const concepts = focusConcepts
       .split(/[,\n]/)
       .map((c) => c.trim())
@@ -88,7 +85,6 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     try {
       let response: DocumentUploadResponse;
 
-      // Topic-only mode: generate from concepts without a document
       if (step === "topic-only") {
         response = await generateFromTopic(concepts);
       } else if (pendingFile) {
@@ -134,13 +130,12 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     }
   }, []);
 
-  // Step 2: Concepts Input Screen (for both document + concepts AND topic-only modes)
+  // Step 2: Concepts Input Screen
   if (step === "concepts" || step === "topic-only") {
     const isTopicOnly = step === "topic-only";
 
     return (
       <div className="flex-1 flex flex-col h-full bg-[#212121]">
-        {/* Top Bar */}
         <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={handleBackToUpload}
@@ -150,9 +145,7 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
           </button>
         </div>
 
-        {/* Center Content */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 max-w-2xl mx-auto w-full relative">
-          {/* Header */}
           <div className="mb-8 text-center">
             <div className="mb-4 inline-flex justify-center">
               <div
@@ -180,7 +173,6 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
             </p>
           </div>
 
-          {/* Concepts Input */}
           <div className="w-full mb-6">
             <div className="bg-[#2f2f2f] rounded-2xl p-5 shadow-lg border border-white/5">
               <label className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
@@ -206,7 +198,6 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="w-full flex gap-3">
             <button
               onClick={handleBackToUpload}
@@ -249,128 +240,170 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
 
   // Step 1: Upload Screen
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#212121]">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <button className="flex items-center gap-2 text-lg font-semibold text-white/90 hover:bg-white/10 px-3 py-2 rounded-lg transition-colors">
-          <span>Synapse 5.2</span>
-          <span className="text-white/50 text-xs">▼</span>
-        </button>
-      </div>
-
-      {/* Center Content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4 max-w-3xl mx-auto w-full relative">
-        {/* Greeting */}
-        <div className="mb-12 text-center">
-          <div className="mb-6 inline-flex justify-center">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-              <div className="w-10 h-10 bg-black rounded-full" />
-            </div>
+    <div className="flex-1 flex flex-col h-full bg-transparent overflow-y-auto">
+      <nav className="relative z-20 flex items-center justify-between px-8 py-6 shrink-0">
+        <div className="flex items-center gap-2 group cursor-pointer">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-white/10 flex items-center justify-center group-hover:border-white/20 transition-all">
+            <div className="w-3 h-3 rounded-full bg-white/70 shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
           </div>
-          <h1 className="text-3xl font-medium text-white mb-2">
-            What's on the agenda today?
+          <span className="font-semibold text-lg tracking-tight text-white/90">
+            Synapse 5.2
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors cursor-pointer">
+            <span className="text-sm font-medium text-white/60">K</span>
+          </div>
+        </div>
+      </nav>
+
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center p-6 max-w-4xl mx-auto w-full">
+        <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-purple-300 mb-6 backdrop-blur-md">
+            <Sparkles className="w-3 h-3" />
+            <span>AI-Powered Learning Engine</span>
+          </div>
+          <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-white/50 pb-2">
+            What are we learning today?
           </h1>
+          <p className="text-lg text-slate-400 max-w-lg mx-auto leading-relaxed">
+            Drop your study materials instantly or ask anything to get started
+            with your personalized graph.
+          </p>
         </div>
 
-        {/* Upload Component (Simplified to just Upload PDF area) */}
-        <div className="w-full mb-6 transition-all animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Collapsible-ish, simplified look */}
-          <div className="bg-[#2f2f2f] rounded-2xl p-4 shadow-lg border border-white/5">
-            <div className="flex gap-3">
-              {/* Upload PDF */}
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                className={`flex-1 border-2 border-dashed rounded-xl h-24 flex items-center justify-center transition-all cursor-pointer ${
-                  dragOver
-                    ? "border-white/40 bg-white/5"
-                    : "border-white/10 hover:border-white/20 hover:bg-white/5"
-                }`}>
-                <label className="flex items-center justify-center w-full h-full cursor-pointer gap-3">
-                  <Upload className="w-6 h-6 text-white/50" />
-                  <div className="flex flex-col items-start">
+        {/* Upload Card - Combined from both versions */}
+        <div className="w-full max-w-2xl mb-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+          <div
+            className={`relative group rounded-3xl p-[1px] bg-gradient-to-br from-white/10 to-transparent transition-all duration-300 ${dragOver ? "scale-[1.02] from-purple-500/50 to-blue-500/50" : ""}`}>
+            <div
+              className={`relative bg-[#0a0a0f]/40 backdrop-blur-xl rounded-3xl p-8 border border-white/5 overflow-hidden transition-all duration-300 group-hover:bg-[#13131f]/40 ${dragOver ? "bg-[#13131f]/60" : ""}`}>
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-transparent to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+              <div className="flex gap-4 relative z-10">
+                {/* Upload PDF */}
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  className={`flex-1 border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center transition-all cursor-pointer ${
+                    dragOver
+                      ? "border-white/40 bg-white/5"
+                      : "border-white/10 hover:border-white/20 hover:bg-white/5"
+                  }`}>
+                  <label className="flex flex-col items-center justify-center w-full cursor-pointer gap-3">
+                    <div className="w-14 h-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-2">
+                      <Upload className="w-6 h-6 text-white/60" />
+                    </div>
                     <span className="text-sm font-medium text-white/80">
                       Upload PDF
                     </span>
                     <span className="text-xs text-white/40">
                       Drag & drop or Click
                     </span>
-                  </div>
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file);
-                    }}
-                  />
-                </label>
-              </div>
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file);
+                      }}
+                    />
+                  </label>
+                </div>
 
-              {/* Learn Any Topic Button */}
-              <button
-                onClick={handleTopicOnlyMode}
-                className="flex-1 border-2 border-dashed border-blue-500/30 rounded-xl h-24 flex items-center justify-center gap-3 transition-all cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5">
-                <BookOpen className="w-6 h-6 text-blue-400/70" />
-                <div className="flex flex-col items-start">
+                {/* Learn Any Topic */}
+                <button
+                  onClick={handleTopicOnlyMode}
+                  className="flex-1 border-2 border-dashed border-blue-500/30 rounded-xl p-6 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5">
+                  <div className="w-14 h-14 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-2">
+                    <BookOpen className="w-6 h-6 text-blue-400" />
+                  </div>
                   <span className="text-sm font-medium text-white/80">
                     Learn Any Topic
                   </span>
                   <span className="text-xs text-white/40">
                     No document needed
                   </span>
-                </div>
-              </button>
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Input Bar (Functional now) */}
-        <div className="w-full relative">
+        {/* Floating Input Bar */}
+        <div className="w-full max-w-2xl relative animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
           <div
-            className={`w-full bg-[#2f2f2f] rounded-[26px] flex items-end p-3 pr-4 shadow-lg border transition-colors ${inputText ? "border-white/20" : "border-white/5"}`}>
-            <button className="w-8 h-8 rounded-full bg-[#212121] flex items-center justify-center text-white/70 hover:text-white mr-3 shrink-0 mb-1">
+            className={`
+              relative flex items-end gap-2 p-2 rounded-[32px] 
+              bg-white/5 backdrop-blur-2xl border transition-all duration-300
+              ${inputText ? "border-purple-500/30 bg-white/10 shadow-[0_0_40px_rgba(168,85,247,0.15)]" : "border-white/10 hover:border-white/20"}
+           `}>
+            <button className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all shrink-0">
               <Plus className="w-5 h-5" />
             </button>
+
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Paste content or ask something..."
-              className="flex-1 bg-transparent border-none outline-none text-white text-base placeholder-white/50 resize-none max-h-32 py-2"
+              placeholder="Paste text or ask a question..."
+              className="flex-1 bg-transparent border-none outline-none text-white text-lg placeholder-white/30 resize-none py-3 px-2 min-h-[48px] max-h-32"
               rows={1}
-              style={{ minHeight: "24px" }}
+              style={{ scrollbarWidth: "none" }}
             />
-            {/* Right Icons */}
-            <div className="flex items-center gap-3 ml-3 mb-1 text-white/70">
+
+            <div className="flex gap-2 pb-1 shrink-0">
               {inputText ? (
                 <button
                   onClick={handleInputSubmit}
                   disabled={isLoading}
-                  className="p-1.5 bg-white text-black rounded-lg hover:bg-white/90 transition-colors">
-                  <ArrowUp className="w-4 h-4" />
+                  className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-200 transition-all shadow-lg active:scale-90">
+                  {isLoading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <ArrowUp className="w-5 h-5" />
+                  )}
                 </button>
               ) : (
-                <></>
+                <>
+                  <button className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all">
+                    <Mic className="w-5 h-5" />
+                  </button>
+                  <button className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all">
+                    <Headphones className="w-5 h-5" />
+                  </button>
+                </>
               )}
             </div>
           </div>
-          <div className="text-center mt-3 text-xs text-white/50">
-            Synapse can make mistakes. Check important info.
+
+          <div className="text-center mt-6 flex items-center justify-center gap-6 text-xs font-medium text-slate-500/60 uppercase tracking-widest">
+            <span className="flex items-center gap-1.5">
+              <Command className="w-3 h-3" /> Focus Mode
+            </span>
+            <span className="flex items-center gap-1.5">
+              <FileText className="w-3 h-3" /> PDF Support
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3" /> AI Analysis
+            </span>
           </div>
         </div>
 
         {error && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm">
-            {error}
+          <div className="fixed top-8 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-200 px-6 py-3 rounded-full backdrop-blur-xl shadow-2xl flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+              {error}
+            </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

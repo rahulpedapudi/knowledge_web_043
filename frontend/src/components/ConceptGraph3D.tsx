@@ -1,9 +1,26 @@
-import { useRef, useState, useCallback, useMemo } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Text, Line } from "@react-three/drei";
+import { useRef, useState, useMemo, useEffect } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import {
+  OrbitControls,
+  Html,
+  QuadraticBezierLine,
+  Billboard,
+} from "@react-three/drei";
 import * as THREE from "three";
-import * as d3 from "d3";
 import type { GraphData, ConceptNode, D3Link } from "@/types";
+import {
+  Database,
+  Server,
+  Code,
+  Layers,
+  Box,
+  FileText,
+  Activity,
+  Users,
+  DollarSign,
+  PieChart,
+  Zap,
+} from "lucide-react";
 
 // ============ Types ============
 
@@ -11,6 +28,13 @@ interface Node3D extends ConceptNode {
   position: [number, number, number];
   color: string;
   size: number;
+  icon?: any;
+  side?: "left" | "right" | "center";
+  variant?: "dark" | "vibrant" | "glass";
+  orbitSpeed?: number;
+  orbitRadius?: number;
+  orbitY?: number;
+  initialAngle?: number;
 }
 
 interface ConceptGraph3DProps {
@@ -22,167 +46,220 @@ interface ConceptGraph3DProps {
   selectedEdgeId?: string | null;
 }
 
-// ============ Color & Size Constants ============
+// ============ Helpers ============
 
-const DEPTH_COLORS = [
-  "#ffd700", // Depth 0: Gold - Core concepts (Brighter)
-  "#3b82f6", // Depth 1: Blue - Primary (Brighter)
-  "#a855f7", // Depth 2: Purple - Secondary (Brighter)
-  "#22c55e", // Depth 3: Green - Detail (Brighter)
-];
-
-const DEPTH_SIZES = [0.8, 0.6, 0.4, 0.3]; // Significantly larger sizes
-
-// Zoom thresholds for each depth level
-const LOD_THRESHOLDS = {
-  0: Infinity, // Always visible
-  1: 25, // Visible when camera distance < 25 (Increased)
-  2: 18, // Visible when camera distance < 18 (Increased)
-  3: 10, // Visible when camera distance < 10 (Increased)
+const getNodeIcon = (node: ConceptNode) => {
+  const label = node.label.toLowerCase();
+  if (label.includes("data") || label.includes("sql")) return Database;
+  if (label.includes("server") || label.includes("host")) return Server;
+  if (
+    label.includes("user") ||
+    label.includes("client") ||
+    label.includes("employer") ||
+    label.includes("employee")
+  )
+    return Users;
+  if (
+    label.includes("money") ||
+    label.includes("cost") ||
+    label.includes("price") ||
+    label.includes("payroll")
+  )
+    return DollarSign;
+  if (label.includes("chart") || label.includes("analytic")) return PieChart;
+  if (label.includes("file") || label.includes("doc")) return FileText;
+  if (
+    label.includes("code") ||
+    label.includes("function") ||
+    label.includes("api")
+  )
+    return Code;
+  if (label.includes("group")) return Layers;
+  return Activity;
 };
 
-// ============ Node Component ============
+// Vibrant colors for Resources (Outer Orbit)
+const VIBRANT_COLORS = [
+  "from-purple-500 to-indigo-600",
+  "from-emerald-400 to-green-600",
+  "from-orange-400 to-red-500",
+  "from-blue-400 to-cyan-500",
+  "from-pink-500 to-rose-500",
+];
 
-interface NodeMeshProps {
-  node: Node3D;
-  isSelected: boolean;
-  isVisible: boolean;
-  onClick: () => void;
-  onDoubleClick: () => void;
-}
+// ============ 3D Components ============
 
-function NodeMesh({
-  node,
-  isSelected,
-  isVisible,
-  onClick,
-  onDoubleClick,
-}: NodeMeshProps) {
-  const meshRef = useRef<THREE.Group>(null);
-  const [hovered, setHovered] = useState(false);
-  const [opacity, setOpacity] = useState(0);
-
-  // Animate opacity based on visibility
-  useFrame(() => {
-    const targetOpacity = isVisible ? 1 : 0;
-    setOpacity((prev) => prev + (targetOpacity - prev) * 0.1);
-  });
-
-  if (opacity < 0.01) return null;
-
-  const scale = isSelected ? 1.3 : hovered ? 1.15 : 1;
+function ConnectionLine({
+  start,
+  end,
+  color,
+  isActive,
+  onHover,
+  onUnhover,
+}: {
+  start: [number, number, number];
+  end: [number, number, number];
+  color: string;
+  isActive: boolean;
+  onHover: () => void;
+  onUnhover: () => void;
+}) {
+  const mid = [
+    (start[0] + end[0]) / 2,
+    (start[1] + end[1]) / 2 + (isActive ? 5 : 2),
+    (start[2] + end[2]) / 2,
+  ] as [number, number, number];
 
   return (
-    <group ref={meshRef} position={node.position}>
-      <mesh
-        scale={scale}
-        onClick={(e) => {
+    <group>
+      <QuadraticBezierLine
+        start={start}
+        end={end}
+        mid={mid}
+        color={isActive ? "#ffffff" : color}
+        lineWidth={isActive ? 3 : 1}
+        transparent
+        opacity={isActive ? 0.9 : 0.3}
+        onPointerOver={(e) => {
           e.stopPropagation();
-          if (isVisible) onClick();
+          onHover();
         }}
-        onDoubleClick={(e) => {
+        onPointerOut={(e) => {
           e.stopPropagation();
-          if (isVisible) onDoubleClick();
+          onUnhover();
         }}
-        onPointerOver={() => isVisible && setHovered(true)}
-        onPointerOut={() => setHovered(false)}>
-        <sphereGeometry args={[node.size, 32, 32]} />
-        <meshBasicMaterial color={node.color} transparent opacity={opacity} />
-      </mesh>
-
-      {/* Glow effect */}
-      {(isSelected || hovered) && opacity > 0.5 && (
-        <mesh scale={1.6}>
-          <sphereGeometry args={[node.size, 16, 16]} />
-          <meshBasicMaterial
-            color={node.color}
-            transparent
-            opacity={0.15 * opacity}
-          />
-        </mesh>
-      )}
-
-      {/* Label - only show when sufficiently visible */}
-      {opacity > 0.3 && (
-        <Text
-          position={[0, node.size + 0.15, 0]}
-          fontSize={0.12 + node.size * 0.1}
-          color="white"
-          anchorX="center"
-          anchorY="bottom"
-          outlineWidth={0.015}
-          outlineColor="black"
-          fillOpacity={opacity}>
-          {node.label.length > 18
-            ? node.label.slice(0, 18) + "..."
-            : node.label}
-        </Text>
-      )}
+      />
+      <QuadraticBezierLine
+        start={start}
+        end={end}
+        mid={mid}
+        color="transparent"
+        lineWidth={15}
+        transparent
+        opacity={0}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          onHover();
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation();
+          onUnhover();
+        }}
+      />
     </group>
   );
 }
 
-// ============ Edge Component ============
-
-interface EdgeLineProps {
-  start: [number, number, number];
-  end: [number, number, number];
-  relationshipType: "direct" | "inverse";
-  isSelected: boolean;
-  isVisible: boolean;
-  onClick: () => void;
-}
-
-function EdgeLine({
-  start,
-  end,
-  relationshipType,
+function NodeCard({
+  node,
   isSelected,
-  isVisible,
+  isHighlighted,
   onClick,
-}: EdgeLineProps) {
-  const color = relationshipType === "direct" ? "#60a5fa" : "#fb923c";
-  const lineWidth = isSelected ? 3 : 1.5;
+  calculatedPosition,
+}: {
+  node: Node3D;
+  isSelected: boolean;
+  isHighlighted: boolean;
+  onClick: () => void;
+  calculatedPosition: [number, number, number];
+}) {
+  const Icon = node.icon || Box;
+  const isCenter = node.side === "center";
 
-  if (!isVisible) return null;
+  let gradient = "from-slate-700 to-slate-600";
+  if (isCenter) {
+    gradient = "from-purple-600 to-indigo-700";
+  } else if (node.variant === "vibrant") {
+    const hash = node.id
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    gradient = VIBRANT_COLORS[hash % VIBRANT_COLORS.length];
+  } else {
+    gradient = "from-[#1a1b26] to-[#24283b]";
+  }
 
   return (
-    <Line
-      points={[start, end]}
-      color={color}
-      lineWidth={lineWidth}
-      transparent
-      opacity={isSelected ? 1 : 0.5}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-    />
+    <Billboard
+      position={calculatedPosition}
+      follow={true}
+      lockX={false}
+      lockY={false}
+      lockZ={false}>
+      <Html transform position={[0, 0, 0]} center zIndexRange={[100, 0]}>
+        <div
+          onClick={onClick}
+          className={`
+                        relative group cursor-pointer transition-all duration-300
+                        ${isSelected ? "scale-125 z-50" : isHighlighted ? "scale-110 z-40" : "hover:scale-110 z-10"}
+                        ${!isSelected && !isHighlighted ? "opacity-90" : "opacity-100"}
+                    `}>
+          {(isSelected || isHighlighted || isCenter) && (
+            <div
+              className={`
+                            absolute -inset-6 rounded-full blur-2xl animate-pulse
+                            bg-gradient-to-r ${gradient}
+                            ${isCenter ? "opacity-40" : "opacity-20"}
+                        `}
+            />
+          )}
+
+          <div
+            className={`
+                        flex flex-col items-center justify-center
+                        backdrop-blur-xl border shadow-2xl transition-all duration-300
+                        ${
+                          isCenter
+                            ? "w-48 h-48 rounded-full border-purple-500/50 bg-[#13131f]/90"
+                            : "w-32 h-32 rounded-3xl"
+                        }
+                        ${
+                          !isCenter &&
+                          (isSelected
+                            ? "border-white/60 bg-[#1e1e2e]/95"
+                            : "border-white/10 bg-[#0a0a0f]/80 hover:border-white/30 hover:bg-[#13131f]/90")
+                        }
+                    `}>
+            <div
+              className={`
+                            flex items-center justify-center mb-3 text-white shadow-lg
+                            ${
+                              isCenter
+                                ? `w-20 h-20 rounded-full bg-gradient-to-br ${gradient}`
+                                : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient}`
+                            }
+                        `}>
+              <Icon className={`${isCenter ? "w-10 h-10" : "w-7 h-7"}`} />
+            </div>
+
+            <div className="px-3 text-center w-full">
+              <span
+                className={`
+                                block font-bold text-white leading-tight truncate w-full
+                                ${isCenter ? "text-xl tracking-wide" : "text-sm"}
+                                drop-shadow-md
+                            `}>
+                {node.label}
+              </span>
+
+              {node.variant === "vibrant" && node.min_value !== undefined && (
+                <div
+                  className={`
+                                    mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium
+                                    bg-gradient-to-r ${gradient} text-white shadow-sm
+                                `}>
+                  $
+                  {(
+                    (node.min_value + (node.max_value || 0)) /
+                    2
+                  ).toLocaleString()}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Html>
+    </Billboard>
   );
-}
-
-// ============ Scene Component with LOD ============
-
-interface SceneProps {
-  nodes: Node3D[];
-  edges: Array<{
-    id: string;
-    source: string;
-    target: string;
-    relationship_type: "direct" | "inverse";
-    description: string;
-    equation?: string;
-    has_simulation: boolean;
-  }>;
-  selectedNodeId?: string | null;
-  selectedEdgeId?: string | null;
-  onNodeClick: (node: Node3D) => void;
-  onNodeDoubleClick: (node: Node3D) => void;
-  onEdgeClick: (edge: D3Link) => void;
-  onZoomChange: (distance: number) => void;
-  controlMode: "rotate" | "pan";
-  zoomDelta: number; // +1 for zoom in, -1 for zoom out, 0 for no change
-  onZoomDeltaConsumed: () => void;
 }
 
 function Scene({
@@ -191,150 +268,83 @@ function Scene({
   selectedNodeId,
   selectedEdgeId,
   onNodeClick,
-  onNodeDoubleClick,
-  onEdgeClick,
-  onZoomChange,
-  controlMode,
-  zoomDelta,
-  onZoomDeltaConsumed,
-}: SceneProps) {
-  const { camera } = useThree();
-  const controlsRef = useRef<any>(null);
-  const [cameraDistance, setCameraDistance] = useState(15);
+}: {
+  nodes: Node3D[];
+  edges: any[];
+  selectedNodeId: string | null | undefined;
+  selectedEdgeId: string | null | undefined;
+  onNodeClick: (n: Node3D) => void;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [animatedNodes, setAnimatedNodes] = useState<Node3D[]>(nodes);
 
-  // Handle zoom delta from buttons
-  useFrame(() => {
-    if (zoomDelta !== 0 && controlsRef.current) {
-      const zoomFactor = zoomDelta > 0 ? 0.9 : 1.1; // zoom in = closer = smaller factor
-      const currentPos = camera.position.clone();
-      const newPos = currentPos.multiplyScalar(zoomFactor);
+  useEffect(() => {
+    setAnimatedNodes(nodes);
+  }, [nodes]);
 
-      // Clamp distance
-      const newDist = newPos.length();
-      if (newDist >= 2 && newDist <= 35) {
-        camera.position.copy(newPos);
-        camera.updateProjectionMatrix();
-        if (controlsRef.current) {
-          controlsRef.current.update();
-        }
+  useFrame((state, delta) => {
+    if (!selectedNodeId) {
+      if (groupRef.current) {
+        groupRef.current.rotation.y += delta * 0.15;
       }
-      onZoomDeltaConsumed();
-    }
-
-    // Track camera distance for LOD
-    const distance = camera.position.length();
-    if (Math.abs(distance - cameraDistance) > 0.3) {
-      setCameraDistance(distance);
-      onZoomChange(distance);
     }
   });
 
-  const nodeMap = useMemo(() => {
-    const map = new Map<string, Node3D>();
-    nodes.forEach((n) => map.set(n.id, n));
-    return map;
-  }, [nodes]);
-
-  // Determine visibility based on depth and camera distance
-  const isNodeVisible = useCallback(
-    (node: Node3D) => {
-      const depthLevel = node.depth_level ?? 0;
-      const threshold =
-        LOD_THRESHOLDS[depthLevel as keyof typeof LOD_THRESHOLDS] ?? 10;
-      return cameraDistance < threshold;
-    },
-    [cameraDistance],
-  );
-
-  const isEdgeVisible = useCallback(
-    (sourceId: string, targetId: string) => {
-      const sourceNode = nodeMap.get(sourceId);
-      const targetNode = nodeMap.get(targetId);
-      if (!sourceNode || !targetNode) return false;
-      return isNodeVisible(sourceNode) && isNodeVisible(targetNode);
-    },
-    [nodeMap, isNodeVisible],
-  );
+  const highlightSet = useMemo(() => {
+    const set = new Set<string>();
+    if (selectedNodeId) {
+      set.add(selectedNodeId);
+      edges.forEach((e) => {
+        if (e.source === selectedNodeId) set.add(e.target);
+        if (e.target === selectedNodeId) set.add(e.source);
+      });
+    }
+    return set;
+  }, [selectedNodeId, edges]);
 
   return (
-    <>
-      {/* Lighting */}
-      <ambientLight intensity={0.5} />
-      <pointLight position={[15, 15, 15]} intensity={1.2} />
-      <pointLight position={[-15, -10, -15]} intensity={0.6} color="#a78bfa" />
+    <group ref={groupRef}>
+      {edges.map((edge, i) => {
+        const source = nodes.find((n) => n.id === edge.source);
+        const target = nodes.find((n) => n.id === edge.target);
+        if (!source || !target) return null;
 
-      {/* Subtle fog for depth perception */}
-      <fog attach="fog" args={["#0d0d1a", 15, 40]} />
+        const isConnectedToSelection =
+          highlightSet.has(source.id) && highlightSet.has(target.id);
+        const isHovered = hoveredEdgeId === edge.id;
 
-      {/* Ground reference plane */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -4, 0]}>
-        <planeGeometry args={[50, 50]} />
-        <meshStandardMaterial color="#1a1a2e" transparent opacity={0.3} />
-      </mesh>
-
-      {/* Edges */}
-      {edges.map((edge) => {
-        const sourceNode = nodeMap.get(edge.source);
-        const targetNode = nodeMap.get(edge.target);
-        if (!sourceNode || !targetNode) return null;
+        let color = "#4b5563";
+        if (target.variant === "vibrant" || source.variant === "vibrant")
+          color = "#a855f7";
+        if (isHovered || isConnectedToSelection) color = "#ffffff";
 
         return (
-          <EdgeLine
+          <ConnectionLine
             key={edge.id}
-            start={sourceNode.position}
-            end={targetNode.position}
-            relationshipType={edge.relationship_type}
-            isSelected={edge.id === selectedEdgeId}
-            isVisible={isEdgeVisible(edge.source, edge.target)}
-            onClick={() =>
-              onEdgeClick({
-                ...edge,
-                source: sourceNode,
-                target: targetNode,
-              })
-            }
+            start={source.position}
+            end={target.position}
+            color={color}
+            isActive={isConnectedToSelection || isHovered}
+            onHover={() => setHoveredEdgeId(edge.id)}
+            onUnhover={() => setHoveredEdgeId(null)}
           />
         );
       })}
 
-      {/* Nodes */}
       {nodes.map((node) => (
-        <NodeMesh
+        <NodeCard
           key={node.id}
           node={node}
           isSelected={node.id === selectedNodeId}
-          isVisible={isNodeVisible(node)}
+          isHighlighted={highlightSet.has(node.id)}
           onClick={() => onNodeClick(node)}
-          onDoubleClick={() => onNodeDoubleClick(node)}
+          calculatedPosition={node.position}
         />
       ))}
-
-      {/* Camera controls */}
-      <OrbitControls
-        ref={controlsRef}
-        enablePan={true}
-        enableZoom={true}
-        enableRotate={true}
-        minDistance={2}
-        maxDistance={35}
-        zoomSpeed={0.8}
-        mouseButtons={{
-          LEFT: controlMode === "rotate" ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
-          MIDDLE: THREE.MOUSE.DOLLY,
-          RIGHT:
-            controlMode === "rotate" ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
-        }}
-        onEnd={() => {
-          // Sync zoom after manual controls
-          const distance = camera.position.length();
-          onZoomChange(distance);
-        }}
-      />
-    </>
+    </group>
   );
 }
-
-// ============ Main Component ============
 
 export function ConceptGraph3D({
   graphData,
@@ -344,224 +354,122 @@ export function ConceptGraph3D({
   selectedNodeId,
   selectedEdgeId,
 }: ConceptGraph3DProps) {
-  const [currentZoom, setCurrentZoom] = useState(15);
-  const [controlMode, setControlMode] = useState<"rotate" | "pan">("rotate");
-  const [zoomDelta, setZoomDelta] = useState(0);
-
-  // Convert graph data to 3D positions with LOD using d3-force
+  // Orbital Layout Algorithm
   const { nodes3D, edges3D } = useMemo(() => {
-    // 1. Prepare data for simulation
-    const simulationNodes = graphData.concepts.map((c) => ({
-      ...c,
-      x: 0,
-      y: 0,
-    }));
+    const nodes: Node3D[] = [];
 
-    const simulationLinks = graphData.relationships.map((r) => ({
-      source: r.source,
-      target: r.target,
-    }));
+    const rootNodes = graphData.concepts.filter(
+      (c) => (c.depth_level ?? 0) === 0,
+    );
+    const root = rootNodes.length > 0 ? rootNodes[0] : graphData.concepts[0];
 
-    // 2. Run simulation synchronously
-    // We run it "instantly" instead of animating it for stability in 3D
-    const simulation = d3
-      .forceSimulation(simulationNodes as any)
-      .force(
-        "link",
-        d3
-          .forceLink(simulationLinks)
-          .id((d: any) => d.id)
-          .distance(2), // Tighter connections for 3D
-      )
-      .force("charge", d3.forceManyBody().strength(-15)) // Less repulsion for tighter clusters
-      .force("center", d3.forceCenter(0, 0))
-      .force("collision", d3.forceCollide().radius(1.5))
-      .stop();
+    if (!root) return { nodes3D: [], edges3D: [] };
 
-    // Run ticks manually to settle the graph
-    for (let i = 0; i < 300; ++i) simulation.tick();
-
-    // 3. Map 2D simulation (x, y) to 3D (x, z) + Abstraction Level (y)
-    const nodes: Node3D[] = simulationNodes.map((node: any) => {
-      const depthLevel = node.depth_level ?? 0;
-
-      // Y based on abstraction (higher = more abstract)
-      const abstraction = node.abstraction_level ?? 5;
-      const yPosition = (abstraction / 10) * 8 - 4; // Range from -4 to 4
-
-      return {
-        ...node,
-        // Map simulation X/Y to 3D X/Z
-        position: [node.x, yPosition, node.y], // node.y from d3 maps to Z depth
-        color: DEPTH_COLORS[depthLevel] || DEPTH_COLORS[3],
-        size: DEPTH_SIZES[depthLevel] || DEPTH_SIZES[3],
-      };
+    nodes.push({
+      ...root,
+      position: [0, 0, 0],
+      color: "#ffffff",
+      size: 1.5,
+      icon: Zap,
+      side: "center",
+      variant: "glass",
     });
 
-    // 4. Create edges
-    const edges = graphData.relationships.map((rel, i) => ({
-      id: `edge-${rel.source}-${rel.target}-${i}`,
-      source: rel.source,
-      target: rel.target,
-      relationship_type: rel.relationship_type,
-      description: rel.description,
-      equation: rel.equation,
-      has_simulation: rel.has_simulation,
-    }));
+    const remainders = graphData.concepts.filter((c) => c.id !== root.id);
 
-    return { nodes3D: nodes, edges3D: edges };
+    const innerOrbitNodes: ConceptNode[] = [];
+    const outerOrbitNodes: ConceptNode[] = [];
+
+    remainders.forEach((node) => {
+      const label = node.label.toLowerCase();
+      const type = node.semantic_type || "";
+      const isEntity =
+        label.includes("user") ||
+        label.includes("client") ||
+        label.includes("empl") ||
+        label.includes("group") ||
+        type === "entity";
+
+      if (isEntity) innerOrbitNodes.push(node);
+      else outerOrbitNodes.push(node);
+    });
+
+    if (innerOrbitNodes.length === 0) {
+      const half = Math.ceil(outerOrbitNodes.length / 2);
+      innerOrbitNodes.push(...outerOrbitNodes.splice(0, half));
+    }
+
+    const innerRadius = 16;
+    const innerStep = (Math.PI * 2) / Math.max(1, innerOrbitNodes.length);
+
+    innerOrbitNodes.forEach((node, i) => {
+      const angle = i * innerStep;
+      nodes.push({
+        ...node,
+        position: [
+          Math.cos(angle) * innerRadius,
+          0,
+          Math.sin(angle) * innerRadius,
+        ],
+        color: "#1e293b",
+        size: 1,
+        side: "left",
+        variant: "dark",
+        icon: getNodeIcon(node),
+      });
+    });
+
+    const outerRadius = 28;
+    const outerStep = (Math.PI * 2) / Math.max(1, outerOrbitNodes.length);
+
+    outerOrbitNodes.forEach((node, i) => {
+      const angle = i * outerStep + Math.PI / 4;
+      const y = Math.sin(angle * 2) * 8;
+
+      nodes.push({
+        ...node,
+        position: [
+          Math.cos(angle) * outerRadius,
+          y,
+          Math.sin(angle) * outerRadius,
+        ],
+        color: "#ff00ff",
+        size: 1,
+        side: "right",
+        variant: "vibrant",
+        icon: getNodeIcon(node),
+      });
+    });
+
+    return { nodes3D: nodes, edges3D: graphData.relationships };
   }, [graphData]);
 
-  const handleNodeClick = useCallback(
-    (node: Node3D) => {
-      onNodeSelect(node);
-    },
-    [onNodeSelect],
-  );
-
-  const handleNodeDoubleClick = useCallback(
-    (node: Node3D) => {
-      onNodeExpand(node);
-    },
-    [onNodeExpand],
-  );
-
-  const handleEdgeClick = useCallback(
-    (edge: D3Link) => {
-      onEdgeSelect(edge);
-    },
-    [onEdgeSelect],
-  );
-
-  // Calculate visible depth level for UI
-  const getVisibleDepth = (distance: number) => {
-    if (distance < LOD_THRESHOLDS[3]) return 3;
-    if (distance < LOD_THRESHOLDS[2]) return 2;
-    if (distance < LOD_THRESHOLDS[1]) return 1;
-    return 0;
-  };
-
-  // Zoom handlers - set delta that Scene will consume
-  const handleZoomIn = useCallback(() => {
-    setZoomDelta(1);
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setZoomDelta(-1);
-  }, []);
-
-  const handleZoomDeltaConsumed = useCallback(() => {
-    setZoomDelta(0);
-  }, []);
-
   return (
-    <div className="w-full h-full relative">
-      <Canvas
-        camera={{ position: [12, 8, 12], fov: 50 }}
-        style={{
-          background:
-            "radial-gradient(ellipse at center, #1a1a2e 0%, #0d0d1a 50%, #050510 100%)",
-        }}>
+    <div className="w-full h-full relative bg-transparent">
+      <Canvas camera={{ position: [0, 30, 45], fov: 45 }}>
+        <fog attach="fog" args={["#050510", 40, 150]} />
+        <ambientLight intensity={0.5} />
+        <pointLight position={[0, 20, 0]} intensity={2} color="#ffffff" />
+        <pointLight position={[20, 0, 20]} intensity={1} color="#a855f7" />
+        <pointLight position={[-20, 0, -20]} intensity={1} color="#3b82f6" />
+
         <Scene
           nodes={nodes3D}
           edges={edges3D}
           selectedNodeId={selectedNodeId}
           selectedEdgeId={selectedEdgeId}
-          onNodeClick={handleNodeClick}
-          onNodeDoubleClick={handleNodeDoubleClick}
-          onEdgeClick={handleEdgeClick}
-          onZoomChange={setCurrentZoom}
-          controlMode={controlMode}
-          zoomDelta={zoomDelta}
-          onZoomDeltaConsumed={handleZoomDeltaConsumed}
+          onNodeClick={onNodeSelect}
+        />
+
+        <OrbitControls
+          enableRotate={true}
+          enableZoom={true}
+          enablePan={true}
+          maxDistance={120}
+          minDistance={10}
+          autoRotate={false}
         />
       </Canvas>
-
-      {/* Zoom Level Indicator */}
-      <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm rounded-xl p-3 text-xs border border-white/10">
-        <div className="text-white/70 font-medium mb-2">Zoom Level</div>
-        <div className="space-y-1">
-          {[0, 1, 2, 3].map((depth) => {
-            const isActive = getVisibleDepth(currentZoom) >= depth;
-            return (
-              <div key={depth} className="flex items-center gap-2">
-                <div
-                  className={`w-3 h-3 rounded-full transition-all ${isActive ? "" : "opacity-30"}`}
-                  style={{ backgroundColor: DEPTH_COLORS[depth] }}
-                />
-                <span
-                  className={`${isActive ? "text-white/80" : "text-white/30"}`}>
-                  {depth === 0 && "Core"}
-                  {depth === 1 && "Primary"}
-                  {depth === 2 && "Secondary"}
-                  {depth === 3 && "Detail"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm rounded-xl p-3 text-xs border border-white/10">
-        <div className="text-white/70 font-medium mb-2">Vertical Axis</div>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-white/50">↑ Abstract / Foundational</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-white/50">↓ Concrete / Specific</span>
-        </div>
-      </div>
-
-      {/* Control Buttons */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-        {/* Mode Toggle */}
-        <div className="bg-black/70 backdrop-blur-sm rounded-xl p-1 border border-white/10 flex">
-          <button
-            onClick={() => setControlMode("rotate")}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-              controlMode === "rotate"
-                ? "bg-white/20 text-white"
-                : "text-white/50 hover:text-white/80"
-            }`}
-            title="Rotate mode">
-            🔄 Rotate
-          </button>
-          <button
-            onClick={() => setControlMode("pan")}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-              controlMode === "pan"
-                ? "bg-white/20 text-white"
-                : "text-white/50 hover:text-white/80"
-            }`}
-            title="Pan mode">
-            ✋ Move
-          </button>
-        </div>
-
-        {/* Zoom Controls */}
-        <div className="bg-black/70 backdrop-blur-sm rounded-xl p-1 border border-white/10 flex flex-col">
-          <button
-            onClick={handleZoomIn}
-            className="px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all text-lg"
-            title="Zoom in">
-            +
-          </button>
-          <div className="h-px bg-white/10" />
-          <button
-            onClick={handleZoomOut}
-            className="px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all text-lg"
-            title="Zoom out">
-            −
-          </button>
-        </div>
-      </div>
-
-      {/* Controls hint */}
-      <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2 text-xs text-white/50 border border-white/10">
-        {controlMode === "rotate" ? "🔄 Drag to rotate" : "✋ Drag to pan"} •
-        Scroll to zoom
-      </div>
     </div>
   );
 }

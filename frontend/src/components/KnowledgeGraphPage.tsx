@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { ConceptGraph3D } from "./ConceptGraph3D";
 import { RightPanel } from "./RightPanel";
 import { getDocumentGraph } from "@/api/client";
@@ -55,6 +55,26 @@ export function KnowledgeGraphPage({
 
     return { concepts: filteredConcepts, relationships: filteredRelationships };
   }, [graphData, visibleNodeIds]);
+
+  // Derive neighbors for the RightPanel
+  const selectedNodeNeighbors = useMemo(() => {
+    if (!selectedNode || !graphData) return [];
+    const neighbors: Array<{ node: ConceptNode; relationship: RelationshipEdge }> = [];
+
+    graphData.relationships.forEach(r => {
+      let neighborId = null;
+      if (r.source === selectedNode.id) neighborId = r.target;
+      else if (r.target === selectedNode.id) neighborId = r.source;
+
+      if (neighborId) {
+        const node = graphData.concepts.find(c => c.id === neighborId);
+        if (node) {
+          neighbors.push({ node, relationship: r });
+        }
+      }
+    });
+    return neighbors;
+  }, [selectedNode, graphData]);
 
   // Load graph when document changes
   const loadGraph = useCallback(async (docId: string, title: string) => {
@@ -119,6 +139,7 @@ export function KnowledgeGraphPage({
       min_value: node.min_value,
       max_value: node.max_value,
       default_value: node.default_value,
+      semantic_type: node.semantic_type, // Maintain type info
     });
     setSelectedEdge(null);
   }, []);
@@ -227,6 +248,7 @@ export function KnowledgeGraphPage({
         documentId={documentId}
         selectedNode={selectedNode}
         selectedEdge={selectedEdge}
+        neighbors={selectedNodeNeighbors}
         onClose={() => {
           setSelectedNode(null);
           setSelectedEdge(null);
