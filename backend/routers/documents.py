@@ -11,7 +11,8 @@ from models import (
     GraphData
 )
 from services.pdf_extractor import extract_sentences_from_pdf, extract_sentences_from_text
-from services.mock_llm import analyze_text, DEMO_TEXT
+from services.llm_service import analyze_text_with_llm
+from services.mock_llm import DEMO_TEXT
 
 router = APIRouter()
 
@@ -54,7 +55,7 @@ async def upload_pdf(
     doc_id = str(result.inserted_id)
     
     # Analyze text for causal relationships
-    analysis = analyze_text(sentences)
+    analysis = analyze_text_with_llm(sentences)
     
     # Store chunks
     for i, sentence in enumerate(sentences):
@@ -144,7 +145,7 @@ async def paste_text(
     doc_id = str(result.inserted_id)
     
     # Analyze text for causal relationships
-    analysis = analyze_text(sentences)
+    analysis = analyze_text_with_llm(sentences)
     
     # Store chunks
     for i, sentence in enumerate(sentences):

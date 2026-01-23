@@ -21,6 +21,7 @@ def split_into_sentences(text: str) -> list[str]:
     """Split text into sentences using regex."""
     # Clean up the text
     text = re.sub(r'\s+', ' ', text)  # Normalize whitespace
+    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text) # Remove control chars
     text = text.strip()
     
     # Split on sentence-ending punctuation
