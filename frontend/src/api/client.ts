@@ -159,3 +159,20 @@ export async function handleGoogleCallback(token: string): Promise<User> {
   // Fetch user profile with the token
   return await getProfile();
 }
+
+// ============ Chat API ============
+
+export async function sendChatMessage(
+  documentId: string,
+  conceptId: string,
+  message: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<{ response: string; context_used: string[] }> {
+  const response = await api.post("/chat/message", {
+    document_id: documentId,
+    concept_id: conceptId,
+    message,
+    history,
+  });
+  return response.data;
+}

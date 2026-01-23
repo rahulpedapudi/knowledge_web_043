@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { ConceptGraph } from "@/components/ConceptGraph";
-import { SimulationPanel } from "@/components/SimulationPanel";
+import { RightPanel } from "@/components/RightPanel";
 import { AuthPage } from "@/components/AuthPage";
 import { GoogleCallback } from "@/components/GoogleCallback";
+import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { getDocumentGraph } from "@/api/client";
 import type {
@@ -21,7 +22,7 @@ function App() {
   const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
 
   const [view, setView] = useState<AppView>("upload");
-  const [, setDocumentId] = useState<string | null>(null);
+  const [documentId, setDocumentId] = useState<string | null>(null);
   const [documentTitle, setDocumentTitle] = useState<string>("");
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
@@ -65,11 +66,6 @@ function App() {
     setSelectedNode(null);
   }, []);
 
-  const handleClosePanel = useCallback(() => {
-    setSelectedNode(null);
-    setSelectedEdge(null);
-  }, []);
-
   const handleBackToUpload = () => {
     setView("upload");
     setGraphData(null);
@@ -99,23 +95,15 @@ function App() {
     return <AuthPage />;
   }
 
+  // ... imports
+
   if (view === "upload") {
     return (
-      <div className="relative">
-        {/* User menu overlay */}
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/80 backdrop-blur-sm rounded-lg border border-slate-700/50">
-            <User className="w-4 h-4 text-blue-400" />
-            <span className="text-sm text-slate-300">{user?.name}</span>
-          </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-800/80 backdrop-blur-sm rounded-lg border border-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700/50 transition-all">
-            <LogOut className="w-4 h-4" />
-            <span className="text-sm">Logout</span>
-          </button>
-        </div>
-        <DocumentUpload onDocumentProcessed={handleDocumentProcessed} />
+      <div className="flex h-screen w-full bg-[#212121] text-white overflow-hidden font-sans">
+        <Sidebar />
+        <main className="flex-1 flex flex-col relative min-w-0">
+          <DocumentUpload onDocumentProcessed={handleDocumentProcessed} />
+        </main>
       </div>
     );
   }
@@ -170,7 +158,7 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 relative overflow-hidden">
+      <main className="flex-1 relative overflow-hidden flex flex-row">
         {isLoadingGraph ? (
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-4">
@@ -180,17 +168,41 @@ function App() {
           </div>
         ) : graphData && graphData.concepts.length > 0 ? (
           <>
-            <ConceptGraph
-              graphData={graphData}
-              onNodeClick={handleNodeClick}
-              onEdgeClick={handleEdgeClick}
-              selectedNodeId={selectedNode?.id}
-              selectedEdgeId={selectedEdge?.id}
-            />
-            <SimulationPanel
-              selectedEdge={selectedEdge}
+            <div className="flex-1 h-full relative">
+              <ConceptGraph
+                graphData={graphData}
+                onNodeClick={handleNodeClick}
+                onEdgeClick={handleEdgeClick}
+                selectedNodeId={selectedNode?.id}
+                selectedEdgeId={selectedEdge?.id}
+              />
+              {/* Instructions overlay (only when no panel is open - actually panel is always open now) */}
+              {/* Maybe keep it but adjust position or meaningfulness? Let's hide it if we have panels. */}
+
+              {!selectedNode && !selectedEdge && (
+                <div className="absolute bottom-4 right-4 bg-slate-800/80 backdrop-blur-sm rounded-lg p-4 text-sm max-w-xs pointer-events-none">
+                  <p className="text-slate-300 mb-2">
+                    <strong>How to use:</strong>
+                  </p>
+                  <ul className="text-slate-400 space-y-1 text-xs">
+                    <li>
+                      • Click a <span className="text-blue-400">node</span> to
+                      chat & see details
+                    </li>
+                    <li>
+                      • Click an <span className="text-purple-400">edge</span>{" "}
+                      for simulation
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <RightPanel
+              documentId={documentId}
               selectedNode={selectedNode}
-              onClose={handleClosePanel}
+              selectedEdge={selectedEdge}
+              graphData={graphData}
             />
           </>
         ) : (

@@ -1,6 +1,15 @@
 import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, FileText, Sparkles, Loader2 } from "lucide-react";
+import {
+  Upload,
+  Sparkles,
+  Loader2,
+  Mic,
+  Headphones,
+  Plus,
+  ArrowUp,
+  Files,
+} from "lucide-react";
 import { uploadPdf, pasteText, createDemo } from "@/api/client";
 import type { DocumentUploadResponse } from "@/types";
 
@@ -10,14 +19,19 @@ interface DocumentUploadProps {
 
 export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"upload" | "paste">("paste");
-  const [textContent, setTextContent] = useState("");
+  const [inputText, setInputText] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handlePasteSubmit = async () => {
-    if (!textContent.trim() || textContent.length < 20) {
-      setError("Please enter at least 20 characters of text");
+  const handleInputSubmit = async () => {
+    if (!inputText.trim()) return;
+
+    // If text is short (like a greeting), maybe we just clear it?
+    // But since this is the "Upload/Analyze" screen, any text input here implies "Analyze this text".
+    // Let's treat it as pasteText content.
+
+    if (inputText.length < 10) {
+      setError("Please enter more text to analyze.");
       return;
     }
 
@@ -25,13 +39,20 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     setError(null);
 
     try {
-      const response = await pasteText(textContent);
+      const response = await pasteText(inputText);
       onDocumentProcessed(response);
     } catch (err) {
       setError("Failed to process text. Please try again.");
       console.error(err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleInputSubmit();
     }
   };
 
@@ -65,88 +86,34 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     }
   }, []);
 
-  const handleDemoClick = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await createDemo();
-      onDocumentProcessed(response);
-    } catch (err) {
-      setError("Failed to create demo. Please try again.");
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-linear-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-4">
-            GENZPULSE
-          </h1>
-          <p className="text-slate-400 text-lg">
-            Transform textbook content into interactive causal structures
-          </p>
-        </div>
+    <div className="flex-1 flex flex-col h-full bg-[#212121]">
+      {/* Top Bar */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <button className="flex items-center gap-2 text-lg font-semibold text-white/90 hover:bg-white/10 px-3 py-2 rounded-lg transition-colors">
+          <span>GENZPULSE 5.2</span>
+          <span className="text-white/50 text-xs">▼</span>
+        </button>
+      </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab("paste")}
-            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
-              activeTab === "paste"
-                ? "bg-blue-600 text-white"
-                : "bg-slate-700/50 text-slate-400 hover:bg-slate-700"
-            }`}>
-            <FileText className="inline-block w-4 h-4 mr-2" />
-            Paste Text
-          </button>
-          <button
-            onClick={() => setActiveTab("upload")}
-            className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
-              activeTab === "upload"
-                ? "bg-blue-600 text-white"
-                : "bg-slate-700/50 text-slate-400 hover:bg-slate-700"
-            }`}>
-            <Upload className="inline-block w-4 h-4 mr-2" />
-            Upload PDF
-          </button>
-        </div>
-
-        {/* Content Area */}
-        <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/50 p-6">
-          {activeTab === "paste" ? (
-            <div className="space-y-4">
-              <textarea
-                value={textContent}
-                onChange={(e) => setTextContent(e.target.value)}
-                placeholder="Paste your textbook content here...
-
-Example: 'When temperature increases in a closed container, pressure also increases proportionally. This relationship is known as Gay-Lussac's Law.'"
-                className="w-full h-64 p-4 bg-slate-900/50 border border-slate-600/50 rounded-xl text-slate-200 placeholder-slate-500 resize-none focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
-              />
-              <Button
-                onClick={handlePasteSubmit}
-                disabled={isLoading || !textContent.trim()}
-                className="w-full py-6 text-lg bg-linear-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 border-0">
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5 mr-2" />
-                    Extract Causal Relationships
-                  </>
-                )}
-              </Button>
+      {/* Center Content */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4 max-w-3xl mx-auto w-full relative">
+        {/* Greeting */}
+        <div className="mb-12 text-center">
+          <div className="mb-6 inline-flex justify-center">
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-black rounded-full" />
             </div>
-          ) : (
+          </div>
+          <h1 className="text-3xl font-medium text-white mb-2">
+            What's on the agenda today?
+          </h1>
+        </div>
+
+        {/* Upload Component (Simplified to just Upload PDF area) */}
+        <div className="w-full mb-6 transition-all animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* Collapsible-ish, simplified look */}
+          <div className="bg-[#2f2f2f] rounded-2xl p-4 shadow-lg border border-white/5">
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -154,59 +121,86 @@ Example: 'When temperature increases in a closed container, pressure also increa
               }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-12 text-center transition-all ${
+              className={`border-2 border-dashed rounded-xl h-24 flex items-center justify-center transition-all cursor-pointer ${
                 dragOver
-                  ? "border-blue-500 bg-blue-500/10"
-                  : "border-slate-600 hover:border-slate-500"
+                  ? "border-white/40 bg-white/5"
+                  : "border-white/10 hover:border-white/20 hover:bg-white/5"
               }`}>
-              {isLoading ? (
-                <div className="flex flex-col items-center">
-                  <Loader2 className="w-12 h-12 text-blue-400 animate-spin mb-4" />
-                  <p className="text-slate-300">Processing PDF...</p>
+              <label className="flex items-center justify-center w-full h-full cursor-pointer gap-3">
+                {isLoading ? (
+                  <Loader2 className="w-6 h-6 text-white/70 animate-spin" />
+                ) : (
+                  <Upload className="w-6 h-6 text-white/50" />
+                )}
+                <div className="flex flex-col items-start">
+                  <span className="text-sm font-medium text-white/80">
+                    Upload PDF
+                  </span>
+                  <span className="text-xs text-white/40">
+                    Drag & drop or Click
+                  </span>
                 </div>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file);
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Input Bar (Functional now) */}
+        <div className="w-full relative">
+          <div
+            className={`w-full bg-[#2f2f2f] rounded-[26px] flex items-end p-3 pr-4 shadow-lg border transition-colors ${inputText ? "border-white/20" : "border-white/5"}`}>
+            <button className="w-8 h-8 rounded-full bg-[#212121] flex items-center justify-center text-white/70 hover:text-white mr-3 shrink-0 mb-1">
+              <Plus className="w-5 h-5" />
+            </button>
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Paste content or ask something..."
+              className="flex-1 bg-transparent border-none outline-none text-white text-base placeholder-white/50 resize-none max-h-32 py-2"
+              rows={1}
+              style={{ minHeight: "24px" }}
+            />
+            {/* Right Icons */}
+            <div className="flex items-center gap-3 ml-3 mb-1 text-white/70">
+              {inputText ? (
+                <button
+                  onClick={handleInputSubmit}
+                  disabled={isLoading}
+                  className="p-1.5 bg-white text-black rounded-lg hover:bg-white/90 transition-colors">
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className="w-4 h-4" />
+                  )}
+                </button>
               ) : (
                 <>
-                  <Upload className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-                  <p className="text-slate-300 mb-2">
-                    Drag & drop your PDF here
-                  </p>
-                  <p className="text-slate-500 text-sm mb-4">or</p>
-                  <label className="cursor-pointer">
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file);
-                      }}
-                    />
-                    <span className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg transition-colors">
-                      Browse Files
-                    </span>
-                  </label>
+                  <Mic className="w-5 h-5 hover:text-white cursor-pointer" />
+                  <Headphones className="w-5 h-5 hover:text-white cursor-pointer" />
                 </>
               )}
             </div>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-              {error}
-            </div>
-          )}
+          </div>
+          <div className="text-center mt-3 text-xs text-white/50">
+            GENZPULSE can make mistakes. Check important info.
+          </div>
         </div>
 
-        {/* Demo Button */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={handleDemoClick}
-            disabled={isLoading}
-            className="text-slate-400 hover:text-blue-400 transition-colors text-sm underline underline-offset-4">
-            or try with demo content →
-          </button>
-        </div>
+        {error && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm">
+            {error}
+          </div>
+        )}
       </div>
     </div>
   );

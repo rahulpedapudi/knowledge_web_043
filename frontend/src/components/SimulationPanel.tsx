@@ -80,18 +80,13 @@ export function SimulationPanel({
   if (!selectedEdge && !selectedNode) return null;
 
   return (
-    <div className="absolute right-0 top-0 h-full w-96 bg-slate-800/95 backdrop-blur-lg border-l border-slate-700/50 shadow-2xl overflow-hidden flex flex-col">
+    <div className="h-full w-full flex flex-col bg-slate-800/50">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
         <div className="flex items-center gap-2">
           <Zap className="w-5 h-5 text-yellow-400" />
           <h2 className="font-semibold text-white">Live Simulation</h2>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 rounded-lg hover:bg-slate-700 transition-colors">
-          <X className="w-5 h-5 text-slate-400" />
-        </button>
       </div>
 
       {/* Content */}
