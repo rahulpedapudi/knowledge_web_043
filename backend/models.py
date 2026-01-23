@@ -147,3 +147,32 @@ class SimulationResult(BaseModel):
     output_value: float
     relationship_type: Literal["direct", "inverse"]
     description: str
+
+
+# ============ User/Auth Models ============
+
+class UserCreate(BaseModel):
+    email: str
+    password: Optional[str] = None  # Optional for OAuth users
+    name: str
+    google_id: Optional[str] = None  # Google OAuth user ID
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    created_at: datetime
+    google_id: Optional[str] = None  # Include for OAuth users
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
