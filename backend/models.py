@@ -115,7 +115,7 @@ class RelationshipEdge(BaseModel):
     id: str
     source: str
     target: str
-    relationship_type: Literal["direct", "inverse"]
+    relationship_type: str  # Changed from Literal to allow flexibility
     description: str
     equation: Optional[str] = None
     has_simulation: bool = True
@@ -145,7 +145,7 @@ class SimulationRequest(BaseModel):
 class SimulationResult(BaseModel):
     input_value: float
     output_value: float
-    relationship_type: Literal["direct", "inverse"]
+    relationship_type: str  # Changed from Literal for flexibility
     description: str
 
 

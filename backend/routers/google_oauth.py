@@ -161,7 +161,7 @@ async def google_callback(
         access_token = create_access_token(data={"sub": user_id})
 
         # Redirect to frontend with token
-        frontend_url = settings.cors_origins[0] if settings.cors_origins else "http://localhost:5173"
+        frontend_url = settings.frontend_url
         redirect_url = f"{frontend_url}/auth/callback?token={access_token}"
 
         return RedirectResponse(url=redirect_url)
