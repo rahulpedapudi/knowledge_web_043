@@ -1,624 +1,493 @@
-import { useRef, useState, useCallback, useMemo } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Text, Line } from "@react-three/drei";
+import { useRef, useState, useCallback, useMemo, useEffect } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { OrbitControls, Html, QuadraticBezierLine, Billboard } from "@react-three/drei";
 import * as THREE from "three";
 import type { GraphData, ConceptNode, D3Link } from "@/types";
+import {
+    Cpu,
+    Database,
+    Globe,
+    Server,
+    Code,
+    Layers,
+    Box,
+    FileText,
+    Activity,
+    Users,
+    Briefcase,
+    DollarSign,
+    PieChart,
+    Zap,
+    Layout
+} from "lucide-react";
 
 // ============ Types ============
 
 interface Node3D extends ConceptNode {
-  position: [number, number, number];
-  color: string;
-  size: number;
+    position: [number, number, number];
+    color: string;
+    size: number;
+    icon?: any;
+    side?: 'left' | 'right' | 'center'; // Kept for compatibility, mapped to Orbit types
+    variant?: 'dark' | 'vibrant' | 'glass';
+    orbitSpeed?: number;
+    orbitRadius?: number;
+    orbitY?: number;
+    initialAngle?: number;
 }
 
 interface ConceptGraph3DProps {
-  graphData: GraphData;
-  onNodeSelect: (node: ConceptNode) => void;
-  onNodeExpand: (node: ConceptNode) => void;
-  onEdgeSelect: (edge: D3Link) => void;
-  selectedNodeId?: string | null;
-  selectedEdgeId?: string | null;
+    graphData: GraphData;
+    onNodeSelect: (node: ConceptNode) => void;
+    onNodeExpand: (node: ConceptNode) => void;
+    onEdgeSelect: (edge: D3Link) => void;
+    selectedNodeId?: string | null;
+    selectedEdgeId?: string | null;
 }
 
-// ============ Color & Size Constants ============
+// ============ Helpers ============
 
-const DEPTH_COLORS = [
-  "#f5c842", // Depth 0: Gold - Core concepts
-  "#60a5fa", // Depth 1: Blue - Primary
-  "#a78bfa", // Depth 2: Purple - Secondary
-  "#34d399", // Depth 3: Green - Detail
-];
-
-const DEPTH_SIZES = [0.5, 0.35, 0.25, 0.18]; // Larger = more important
-
-// Zoom thresholds for each depth level
-const LOD_THRESHOLDS = {
-  0: Infinity, // Always visible
-  1: 18, // Visible when camera distance < 18
-  2: 12, // Visible when camera distance < 12
-  3: 7, // Visible when camera distance < 7
+const getNodeIcon = (node: ConceptNode) => {
+    const label = node.label.toLowerCase();
+    if (label.includes("data") || label.includes("sql")) return Database;
+    if (label.includes("server") || label.includes("host")) return Server;
+    if (label.includes("user") || label.includes("client") || label.includes("employer") || label.includes("employee")) return Users;
+    if (label.includes("money") || label.includes("cost") || label.includes("price") || label.includes("payroll")) return DollarSign;
+    if (label.includes("chart") || label.includes("analytic")) return PieChart;
+    if (label.includes("file") || label.includes("doc")) return FileText;
+    if (label.includes("code") || label.includes("function") || label.includes("api")) return Code;
+    if (label.includes("group")) return Layers;
+    return Activity;
 };
 
-// ============ Node Component ============
+// Vibrant colors for Resources (Outer Orbit)
+const VIBRANT_COLORS = [
+    "from-purple-500 to-indigo-600",
+    "from-emerald-400 to-green-600",
+    "from-orange-400 to-red-500",
+    "from-blue-400 to-cyan-500",
+    "from-pink-500 to-rose-500",
+];
 
-interface NodeMeshProps {
-  node: Node3D;
-  isSelected: boolean;
-  isVisible: boolean;
-  onClick: () => void;
-  onDoubleClick: () => void;
+// Dark colors for Entities (Inner Orbit)
+const DARK_COLORS = [
+    "from-slate-700 to-slate-800",
+    "from-slate-800 to-zinc-800",
+    "from-neutral-800 to-stone-900",
+];
+
+// ============ 3D Components ============
+
+function ConnectionLine({
+    start,
+    end,
+    color,
+    isActive,
+    onHover,
+    onUnhover
+}: {
+    start: [number, number, number],
+    end: [number, number, number],
+    color: string,
+    isActive: boolean,
+    onHover: () => void,
+    onUnhover: () => void
+}) {
+    // Standard Bezier for orbits (Center to Orbit)
+    // We lift the mid point significantly to create "Arches"
+
+    // Check distance - if far (Orbit to Orbit), high arch. If Center to Orbit, medium arch.
+    const dist = Math.sqrt(
+        Math.pow(end[0] - start[0], 2) +
+        Math.pow(end[2] - start[2], 2)
+    );
+
+    const mid = [
+        (start[0] + end[0]) / 2,
+        (start[1] + end[1]) / 2 + (isActive ? 5 : 2), // Higher arch when active
+        (start[2] + end[2]) / 2
+    ] as [number, number, number];
+
+    return (
+        <group>
+            {/* Visible Line */}
+            <QuadraticBezierLine
+                start={start}
+                end={end}
+                mid={mid}
+                color={isActive ? "#ffffff" : color}
+                lineWidth={isActive ? 3 : 1}
+                transparent
+                opacity={isActive ? 0.9 : 0.3}
+                onPointerOver={(e) => { e.stopPropagation(); onHover(); }}
+                onPointerOut={(e) => { e.stopPropagation(); onUnhover(); }}
+            />
+            {/* Hitbox */}
+            <QuadraticBezierLine
+                start={start}
+                end={end}
+                mid={mid}
+                color="transparent"
+                lineWidth={15}
+                transparent
+                opacity={0}
+                onPointerOver={(e) => { e.stopPropagation(); onHover(); }}
+                onPointerOut={(e) => { e.stopPropagation(); onUnhover(); }}
+            />
+        </group>
+    );
 }
 
-function NodeMesh({
-  node,
-  isSelected,
-  isVisible,
-  onClick,
-  onDoubleClick,
-}: NodeMeshProps) {
-  const meshRef = useRef<THREE.Group>(null);
-  const [hovered, setHovered] = useState(false);
-  const [opacity, setOpacity] = useState(0);
+function NodeCard({
+    node,
+    isSelected,
+    isHighlighted,
+    onClick,
+    calculatedPosition
+}: {
+    node: Node3D,
+    isSelected: boolean,
+    isHighlighted: boolean,
+    onClick: () => void,
+    calculatedPosition: [number, number, number]
+}) {
+    const Icon = node.icon || Box;
+    const isCenter = node.side === 'center';
 
-  // Animate opacity based on visibility
-  useFrame(() => {
-    const targetOpacity = isVisible ? 1 : 0;
-    setOpacity((prev) => prev + (targetOpacity - prev) * 0.1);
-  });
+    // Choose Gradient based on Variant (which we mapped to side/orbit)
+    let gradient = "from-slate-700 to-slate-600";
+    if (isCenter) {
+        gradient = "from-purple-600 to-indigo-700";
+    } else if (node.variant === 'vibrant') {
+        const hash = node.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        gradient = VIBRANT_COLORS[hash % VIBRANT_COLORS.length];
+    } else {
+        gradient = "from-[#1a1b26] to-[#24283b]";
+    }
 
-  if (opacity < 0.01) return null;
+    return (
+        <Billboard
+            position={calculatedPosition}
+            follow={true}
+            lockX={false}
+            lockY={false}
+            lockZ={false}
+        >
+            <Html transform position={[0, 0, 0]} center zIndexRange={[100, 0]}>
+                <div
+                    onClick={onClick}
+                    className={`
+                        relative group cursor-pointer transition-all duration-300
+                        ${isSelected ? 'scale-125 z-50' : isHighlighted ? 'scale-110 z-40' : 'hover:scale-110 z-10'}
+                        ${!isSelected && !isHighlighted ? 'opacity-90' : 'opacity-100'}
+                    `}
+                >
+                    {/* Active Halo */}
+                    {(isSelected || isHighlighted || isCenter) && (
+                        <div className={`
+                            absolute -inset-6 rounded-full blur-2xl animate-pulse
+                            bg-gradient-to-r ${gradient}
+                            ${isCenter ? 'opacity-40' : 'opacity-20'}
+                        `} />
+                    )}
 
-  const scale = isSelected ? 1.3 : hovered ? 1.15 : 1;
+                    {/* Main Card Content */}
+                    <div className={`
+                        flex flex-col items-center justify-center
+                        backdrop-blur-xl border shadow-2xl transition-all duration-300
+                        ${isCenter
+                            ? 'w-48 h-48 rounded-full border-purple-500/50 bg-[#13131f]/90'
+                            : 'w-32 h-32 rounded-3xl'
+                        }
+                        ${!isCenter && (isSelected
+                            ? 'border-white/60 bg-[#1e1e2e]/95'
+                            : 'border-white/10 bg-[#0a0a0f]/80 hover:border-white/30 hover:bg-[#13131f]/90'
+                        )}
+                    `}>
+                        {/* Icon Container */}
+                        <div className={`
+                            flex items-center justify-center mb-3 text-white shadow-lg
+                            ${isCenter
+                                ? `w-20 h-20 rounded-full bg-gradient-to-br ${gradient}`
+                                : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient}`
+                            }
+                        `}>
+                            <Icon className={`${isCenter ? 'w-10 h-10' : 'w-7 h-7'}`} />
+                        </div>
 
-  return (
-    <group ref={meshRef} position={node.position}>
-      <mesh
-        scale={scale}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (isVisible) onClick();
-        }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          if (isVisible) onDoubleClick();
-        }}
-        onPointerOver={() => isVisible && setHovered(true)}
-        onPointerOut={() => setHovered(false)}>
-        <sphereGeometry args={[node.size, 32, 32]} />
-        <meshStandardMaterial
-          color={node.color}
-          emissive={node.color}
-          emissiveIntensity={isSelected ? 0.6 : hovered ? 0.4 : 0.2}
-          metalness={0.2}
-          roughness={0.5}
-          transparent
-          opacity={opacity}
-        />
-      </mesh>
+                        {/* Label */}
+                        <div className="px-3 text-center w-full">
+                            <span className={`
+                                block font-bold text-white leading-tight truncate w-full
+                                ${isCenter ? 'text-xl tracking-wide' : 'text-sm'}
+                                drop-shadow-md
+                            `}>
+                                {node.label}
+                            </span>
 
-      {/* Glow effect */}
-      {(isSelected || hovered) && opacity > 0.5 && (
-        <mesh scale={1.6}>
-          <sphereGeometry args={[node.size, 16, 16]} />
-          <meshBasicMaterial
-            color={node.color}
-            transparent
-            opacity={0.15 * opacity}
-          />
-        </mesh>
-      )}
-
-      {/* Label - only show when sufficiently visible */}
-      {opacity > 0.3 && (
-        <Text
-          position={[0, node.size + 0.15, 0]}
-          fontSize={0.12 + node.size * 0.1}
-          color="white"
-          anchorX="center"
-          anchorY="bottom"
-          outlineWidth={0.015}
-          outlineColor="black"
-          fillOpacity={opacity}>
-          {node.label.length > 18
-            ? node.label.slice(0, 18) + "..."
-            : node.label}
-        </Text>
-      )}
-    </group>
-  );
-}
-
-// ============ Edge Component ============
-
-interface EdgeLineProps {
-  start: [number, number, number];
-  end: [number, number, number];
-  relationshipType: "direct" | "inverse";
-  isSelected: boolean;
-  isVisible: boolean;
-  onClick: () => void;
-}
-
-function EdgeLine({
-  start,
-  end,
-  relationshipType,
-  isSelected,
-  isVisible,
-  onClick,
-}: EdgeLineProps) {
-  const color = relationshipType === "direct" ? "#60a5fa" : "#fb923c";
-  const lineWidth = isSelected ? 3 : 1.5;
-
-  if (!isVisible) return null;
-
-  return (
-    <Line
-      points={[start, end]}
-      color={color}
-      lineWidth={lineWidth}
-      transparent
-      opacity={isSelected ? 1 : 0.5}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-    />
-  );
-}
-
-// ============ Scene Component with LOD ============
-
-interface SceneProps {
-  nodes: Node3D[];
-  edges: Array<{
-    id: string;
-    source: string;
-    target: string;
-    relationship_type: "direct" | "inverse";
-    description: string;
-    equation?: string;
-    has_simulation: boolean;
-  }>;
-  selectedNodeId?: string | null;
-  selectedEdgeId?: string | null;
-  onNodeClick: (node: Node3D) => void;
-  onNodeDoubleClick: (node: Node3D) => void;
-  onEdgeClick: (edge: D3Link) => void;
-  onZoomChange: (distance: number) => void;
-  controlMode: "rotate" | "pan";
-  zoomDelta: number; // +1 for zoom in, -1 for zoom out, 0 for no change
-  onZoomDeltaConsumed: () => void;
+                            {/* Stats Badge - Only for Resources/Vibrant nodes to keep it clean */}
+                            {node.variant === 'vibrant' && node.min_value !== undefined && (
+                                <div className={`
+                                    mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium
+                                    bg-gradient-to-r ${gradient} text-white shadow-sm
+                                `}>
+                                    ${((node.min_value + (node.max_value || 0)) / 2).toLocaleString()}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </Html>
+        </Billboard>
+    );
 }
 
 function Scene({
-  nodes,
-  edges,
-  selectedNodeId,
-  selectedEdgeId,
-  onNodeClick,
-  onNodeDoubleClick,
-  onEdgeClick,
-  onZoomChange,
-  controlMode,
-  zoomDelta,
-  onZoomDeltaConsumed,
-}: SceneProps) {
-  const { camera } = useThree();
-  const controlsRef = useRef<any>(null);
-  const [cameraDistance, setCameraDistance] = useState(15);
+    nodes,
+    edges,
+    selectedNodeId,
+    selectedEdgeId,
+    onNodeClick
+}: {
+    nodes: Node3D[],
+    edges: any[],
+    selectedNodeId: string | null | undefined,
+    selectedEdgeId: string | null | undefined,
+    onNodeClick: (n: Node3D) => void
+}) {
+    const groupRef = useRef<THREE.Group>(null);
+    const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+    // State to force re-renders for animation if needed, or refs for positions.
+    // However, React Three Fiber makes it easier to animate inside components.
+    // For orbit, we need to calculate position every frame if we want them to actually move.
 
-  // Handle zoom delta from buttons
-  useFrame(() => {
-    if (zoomDelta !== 0 && controlsRef.current) {
-      const zoomFactor = zoomDelta > 0 ? 0.9 : 1.1; // zoom in = closer = smaller factor
-      const currentPos = camera.position.clone();
-      const newPos = currentPos.multiplyScalar(zoomFactor);
+    // We'll store current positions in a local ref map to avoid full React reconciliations every frame?
+    // Actually, for < 50 nodes, React reconciliations are fine. 
+    // To make it efficient, we can use a Ref for the timestamps.
+    const timeRef = useRef(0);
+    const [animatedNodes, setAnimatedNodes] = useState<Node3D[]>(nodes);
 
-      // Clamp distance
-      const newDist = newPos.length();
-      if (newDist >= 2 && newDist <= 35) {
-        camera.position.copy(newPos);
-        camera.updateProjectionMatrix();
-        if (controlsRef.current) {
-          controlsRef.current.update();
-        }
-      }
-      onZoomDeltaConsumed();
-    }
+    // Update local state when props change
+    useEffect(() => {
+        setAnimatedNodes(nodes);
+    }, [nodes]);
 
-    // Track camera distance for LOD
-    const distance = camera.position.length();
-    if (Math.abs(distance - cameraDistance) > 0.3) {
-      setCameraDistance(distance);
-      onZoomChange(distance);
-    }
-  });
+    // Animate Orbits
+    useFrame((state, delta) => {
+        if (!selectedNodeId) { // Pause logic: only rotate if no node selected? Or keep rotating? 
+            // User requested "Revolve", usually implies constant motion.
 
-  const nodeMap = useMemo(() => {
-    const map = new Map<string, Node3D>();
-    nodes.forEach((n) => map.set(n.id, n));
-    return map;
-  }, [nodes]);
+            timeRef.current += delta * 0.2; // Speed factor
 
-  // Determine visibility based on depth and camera distance
-  const isNodeVisible = useCallback(
-    (node: Node3D) => {
-      const depthLevel = node.depth_level ?? 0;
-      const threshold =
-        LOD_THRESHOLDS[depthLevel as keyof typeof LOD_THRESHOLDS] ?? 10;
-      return cameraDistance < threshold;
-    },
-    [cameraDistance],
-  );
+            // We can't easily update the 'nodes' prop array directly. 
+            // Instead, we can pass the time to the NodeCard/ConnectionLine or update state.
+            // Updating state every frame in React is heavy.
+            // Better approach: Calculate positions in the Render loop.
+            // But we need positions for Lines too.
 
-  const isEdgeVisible = useCallback(
-    (sourceId: string, targetId: string) => {
-      const sourceNode = nodeMap.get(sourceId);
-      const targetNode = nodeMap.get(targetId);
-      if (!sourceNode || !targetNode) return false;
-      return isNodeVisible(sourceNode) && isNodeVisible(targetNode);
-    },
-    [nodeMap, isNodeVisible],
-  );
+            // Optimized approach for R3F:
+            // Use refs for the group/nodes and update matrix? hard with HTML.
+            // We will stick to state update for now, optimized by only doing it if essential.
+            // Actually, let's just use `useFrame` to update a ref-based position map if possible, 
+            // but since we render generic components, let's just make the whole Group rotate?
+            // "Nodes should revolve around the centre" -> Whole system rotation?
+            // "Centre" implies the hub stays still.
 
-  return (
-    <>
-      {/* Lighting */}
-      <ambientLight intensity={0.5} />
-      <pointLight position={[15, 15, 15]} intensity={1.2} />
-      <pointLight position={[-15, -10, -15]} intensity={0.6} color="#a78bfa" />
-
-      {/* Subtle fog for depth perception */}
-      <fog attach="fog" args={["#0d0d1a", 15, 40]} />
-
-      {/* Ground reference plane */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -4, 0]}>
-        <planeGeometry args={[50, 50]} />
-        <meshStandardMaterial color="#1a1a2e" transparent opacity={0.3} />
-      </mesh>
-
-      {/* Edges */}
-      {edges.map((edge) => {
-        const sourceNode = nodeMap.get(edge.source);
-        const targetNode = nodeMap.get(edge.target);
-        if (!sourceNode || !targetNode) return null;
-
-        return (
-          <EdgeLine
-            key={edge.id}
-            start={sourceNode.position}
-            end={targetNode.position}
-            relationshipType={edge.relationship_type}
-            isSelected={edge.id === selectedEdgeId}
-            isVisible={isEdgeVisible(edge.source, edge.target)}
-            onClick={() =>
-              onEdgeClick({
-                ...edge,
-                source: sourceNode,
-                target: targetNode,
-              })
+            // If the hub is 0,0,0, rotating the whole Group around Y works perfectly and is cheap!
+            if (groupRef.current) {
+                groupRef.current.rotation.y += delta * 0.15;
             }
-          />
-        );
-      })}
+        }
+    });
 
-      {/* Nodes */}
-      {nodes.map((node) => (
-        <NodeMesh
-          key={node.id}
-          node={node}
-          isSelected={node.id === selectedNodeId}
-          isVisible={isNodeVisible(node)}
-          onClick={() => onNodeClick(node)}
-          onDoubleClick={() => onNodeDoubleClick(node)}
-        />
-      ))}
+    // Identify highlighted nodes
+    const highlightSet = useMemo(() => {
+        const set = new Set<string>();
+        if (selectedNodeId) {
+            set.add(selectedNodeId);
+            edges.forEach(e => {
+                if (e.source === selectedNodeId) set.add(e.target);
+                if (e.target === selectedNodeId) set.add(e.source);
+            });
+        }
+        return set;
+    }, [selectedNodeId, edges]);
 
-      {/* Camera controls */}
-      <OrbitControls
-        ref={controlsRef}
-        enablePan={true}
-        enableZoom={true}
-        enableRotate={true}
-        minDistance={2}
-        maxDistance={35}
-        zoomSpeed={0.8}
-        mouseButtons={{
-          LEFT: controlMode === "rotate" ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN,
-          MIDDLE: THREE.MOUSE.DOLLY,
-          RIGHT:
-            controlMode === "rotate" ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
-        }}
-        onEnd={() => {
-          // Sync zoom after manual controls
-          const distance = camera.position.length();
-          onZoomChange(distance);
-        }}
-      />
-    </>
-  );
+    return (
+        <group ref={groupRef}>
+            {/* Edges */}
+            {edges.map((edge, i) => {
+                const source = nodes.find(n => n.id === edge.source);
+                const target = nodes.find(n => n.id === edge.target);
+                if (!source || !target) return null;
+
+                const isConnectedToSelection = highlightSet.has(source.id) && highlightSet.has(target.id);
+                const isHovered = hoveredEdgeId === edge.id;
+
+                let color = "#4b5563";
+                if (target.variant === 'vibrant' || source.variant === 'vibrant') color = "#a855f7";
+                if (isHovered || isConnectedToSelection) color = "#ffffff";
+
+                return (
+                    <ConnectionLine
+                        key={edge.id}
+                        start={source.position}
+                        end={target.position}
+                        color={color}
+                        isActive={isConnectedToSelection || isHovered}
+                        onHover={() => setHoveredEdgeId(edge.id)}
+                        onUnhover={() => setHoveredEdgeId(null)}
+                    />
+                );
+            })}
+
+            {/* Nodes */}
+            {nodes.map(node => (
+                <NodeCard
+                    key={node.id}
+                    node={node}
+                    isSelected={node.id === selectedNodeId}
+                    isHighlighted={highlightSet.has(node.id)}
+                    onClick={() => onNodeClick(node)}
+                    calculatedPosition={node.position} // If we were doing individual orbits, we'd calc this here
+                />
+            ))}
+        </group>
+    );
 }
 
-// ============ Main Component ============
-
 export function ConceptGraph3D({
-  graphData,
-  onNodeSelect,
-  onNodeExpand,
-  onEdgeSelect,
-  selectedNodeId,
-  selectedEdgeId,
+    graphData,
+    onNodeSelect,
+    onNodeExpand,
+    onEdgeSelect,
+    selectedNodeId,
+    selectedEdgeId,
 }: ConceptGraph3DProps) {
-  const [currentZoom, setCurrentZoom] = useState(15);
-  const [controlMode, setControlMode] = useState<"rotate" | "pan">("rotate");
-  const [zoomDelta, setZoomDelta] = useState(0);
 
-  // Convert graph data to 3D positions with LOD
-  const { nodes3D, edges3D } = useMemo(() => {
-    // Group concepts by parent for hierarchical clustering
-    const parentGroups = new Map<string, ConceptNode[]>();
-    const rootNodes: ConceptNode[] = [];
+    // Orbital Layout Algorithm
+    const { nodes3D, edges3D } = useMemo(() => {
+        const nodes: Node3D[] = [];
 
-    graphData.concepts.forEach((concept) => {
-      const parents = concept.parent_concepts || [];
-      if (parents.length === 0) {
-        rootNodes.push(concept);
-      } else {
-        parents.forEach((parentId) => {
-          if (!parentGroups.has(parentId)) {
-            parentGroups.set(parentId, []);
-          }
-          parentGroups.get(parentId)!.push(concept);
+        // 1. Identify Root
+        const rootNodes = graphData.concepts.filter(c => (c.depth_level ?? 0) === 0);
+        const root = rootNodes.length > 0 ? rootNodes[0] : graphData.concepts[0];
+
+        if (!root) return { nodes3D: [], edges3D: [] };
+
+        // Place Root
+        nodes.push({
+            ...root,
+            position: [0, 0, 0],
+            color: "#ffffff",
+            size: 1.5,
+            icon: Zap,
+            side: 'center',
+            variant: 'glass'
         });
-      }
-    });
 
-    // Position nodes in 3D space
-    const nodes: Node3D[] = [];
-    const positioned = new Set<string>();
+        // 2. Classify remaining nodes
+        const remainders = graphData.concepts.filter(c => c.id !== root.id);
 
-    // Position root/core nodes first (depth 0)
-    const coreNodes = graphData.concepts.filter(
-      (c) => (c.depth_level ?? 0) === 0,
-    );
-    const angleStep = (Math.PI * 2) / Math.max(coreNodes.length, 1);
+        const innerOrbitNodes: ConceptNode[] = [];
+        const outerOrbitNodes: ConceptNode[] = [];
 
-    coreNodes.forEach((concept, i) => {
-      const angle = i * angleStep;
-      const radius = 3;
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius;
+        // Logic: Entities (People) -> Inner Orbit. Resources (Data) -> Outer Orbit.
+        remainders.forEach(node => {
+            const label = node.label.toLowerCase();
+            const type = node.semantic_type || "";
+            const isEntity = label.includes("user") || label.includes("client") || label.includes("empl") || label.includes("group") || type === "entity";
 
-      // Y based on abstraction (higher = more abstract)
-      const abstraction = concept.abstraction_level ?? 5;
-      const y = (abstraction / 10) * 6 - 2;
+            if (isEntity) innerOrbitNodes.push(node);
+            else outerOrbitNodes.push(node);
+        });
 
-      const depthLevel = concept.depth_level ?? 0;
-
-      nodes.push({
-        ...concept,
-        position: [x, y, z],
-        color: DEPTH_COLORS[depthLevel] || DEPTH_COLORS[0],
-        size: DEPTH_SIZES[depthLevel] || DEPTH_SIZES[0],
-      });
-      positioned.add(concept.id);
-    });
-
-    // Position remaining nodes based on their depth and relationships
-    const remainingNodes = graphData.concepts.filter(
-      (c) => !positioned.has(c.id),
-    );
-
-    remainingNodes.forEach((concept) => {
-      const depthLevel = concept.depth_level ?? 1;
-      const parents = concept.parent_concepts || [];
-
-      // Find parent position to cluster near
-      let baseX = 0,
-        baseY = 0,
-        baseZ = 0;
-      let parentCount = 0;
-
-      parents.forEach((parentId) => {
-        const parentNode = nodes.find((n) => n.id === parentId);
-        if (parentNode) {
-          baseX += parentNode.position[0];
-          baseY += parentNode.position[1];
-          baseZ += parentNode.position[2];
-          parentCount++;
+        // Balance check: if either is empty/too small, mix them
+        if (innerOrbitNodes.length === 0) {
+            const half = Math.ceil(outerOrbitNodes.length / 2);
+            innerOrbitNodes.push(...outerOrbitNodes.splice(0, half));
         }
-      });
 
-      if (parentCount > 0) {
-        baseX /= parentCount;
-        baseY /= parentCount;
-        baseZ /= parentCount;
-      }
+        // 3. Position Inner Orbit (Entities, Dark)
+        const innerRadius = 16;
+        const innerStep = (Math.PI * 2) / Math.max(1, innerOrbitNodes.length);
 
-      // Add offset based on depth level (deeper = further out)
-      const offsetRadius = 1.5 + depthLevel * 0.8;
-      const offsetAngle = Math.random() * Math.PI * 2;
-      const x = baseX + Math.cos(offsetAngle) * offsetRadius;
-      const z = baseZ + Math.sin(offsetAngle) * offsetRadius;
+        innerOrbitNodes.forEach((node, i) => {
+            const angle = i * innerStep;
+            nodes.push({
+                ...node,
+                position: [
+                    Math.cos(angle) * innerRadius,
+                    0, // Flat ring
+                    Math.sin(angle) * innerRadius
+                ],
+                color: "#1e293b",
+                size: 1,
+                side: 'left', // mapped to inner
+                variant: 'dark',
+                icon: getNodeIcon(node)
+            });
+        });
 
-      // Y based on abstraction
-      const abstraction = concept.abstraction_level ?? 5;
-      const y = (abstraction / 10) * 6 - 2;
+        // 4. Position Outer Orbit (Resources, Vibrant)
+        const outerRadius = 28;
+        const outerStep = (Math.PI * 2) / Math.max(1, outerOrbitNodes.length);
 
-      nodes.push({
-        ...concept,
-        position: [x, y, z],
-        color: DEPTH_COLORS[depthLevel] || DEPTH_COLORS[3],
-        size: DEPTH_SIZES[depthLevel] || DEPTH_SIZES[3],
-      });
-    });
+        outerOrbitNodes.forEach((node, i) => {
+            const angle = i * outerStep + (Math.PI / 4); // Offset start
+            // Add some verticality to outer ring for "3D" feel
+            const y = Math.sin(angle * 2) * 8;
 
-    // Create edges with IDs
-    const edges = graphData.relationships.map((rel, i) => ({
-      id: `edge-${rel.source}-${rel.target}-${i}`,
-      source: rel.source,
-      target: rel.target,
-      relationship_type: rel.relationship_type,
-      description: rel.description,
-      equation: rel.equation,
-      has_simulation: rel.has_simulation,
-    }));
+            nodes.push({
+                ...node,
+                position: [
+                    Math.cos(angle) * outerRadius,
+                    y,
+                    Math.sin(angle) * outerRadius
+                ],
+                color: "#ff00ff",
+                size: 1,
+                side: 'right', // mapped to outer
+                variant: 'vibrant',
+                icon: getNodeIcon(node)
+            });
+        });
 
-    return { nodes3D: nodes, edges3D: edges };
-  }, [graphData]);
+        return { nodes3D: nodes, edges3D: graphData.relationships };
 
-  const handleNodeClick = useCallback(
-    (node: Node3D) => {
-      onNodeSelect(node);
-    },
-    [onNodeSelect],
-  );
+    }, [graphData]);
 
-  const handleNodeDoubleClick = useCallback(
-    (node: Node3D) => {
-      onNodeExpand(node);
-    },
-    [onNodeExpand],
-  );
+    return (
+        <div className="w-full h-full relative bg-transparent">
+            {/* Camera angle logic:
+                User wants to see them revolving. 
+                A slight high-angle view (45 deg) is best for orbits.
+            */}
+            <Canvas camera={{ position: [0, 30, 45], fov: 45 }}>
+                {/* Environment */}
+                <fog attach="fog" args={['#050510', 40, 150]} />
+                <ambientLight intensity={0.5} />
+                <pointLight position={[0, 20, 0]} intensity={2} color="#ffffff" />
+                <pointLight position={[20, 0, 20]} intensity={1} color="#a855f7" />
+                <pointLight position={[-20, 0, -20]} intensity={1} color="#3b82f6" />
 
-  const handleEdgeClick = useCallback(
-    (edge: D3Link) => {
-      onEdgeSelect(edge);
-    },
-    [onEdgeSelect],
-  );
-
-  // Calculate visible depth level for UI
-  const getVisibleDepth = (distance: number) => {
-    if (distance < LOD_THRESHOLDS[3]) return 3;
-    if (distance < LOD_THRESHOLDS[2]) return 2;
-    if (distance < LOD_THRESHOLDS[1]) return 1;
-    return 0;
-  };
-
-  // Zoom handlers - set delta that Scene will consume
-  const handleZoomIn = useCallback(() => {
-    setZoomDelta(1);
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setZoomDelta(-1);
-  }, []);
-
-  const handleZoomDeltaConsumed = useCallback(() => {
-    setZoomDelta(0);
-  }, []);
-
-  return (
-    <div className="w-full h-full relative">
-      <Canvas
-        camera={{ position: [12, 8, 12], fov: 50 }}
-        style={{
-          background:
-            "radial-gradient(ellipse at center, #1a1a2e 0%, #0d0d1a 50%, #050510 100%)",
-        }}>
-        <Scene
-          nodes={nodes3D}
-          edges={edges3D}
-          selectedNodeId={selectedNodeId}
-          selectedEdgeId={selectedEdgeId}
-          onNodeClick={handleNodeClick}
-          onNodeDoubleClick={handleNodeDoubleClick}
-          onEdgeClick={handleEdgeClick}
-          onZoomChange={setCurrentZoom}
-          controlMode={controlMode}
-          zoomDelta={zoomDelta}
-          onZoomDeltaConsumed={handleZoomDeltaConsumed}
-        />
-      </Canvas>
-
-      {/* Zoom Level Indicator */}
-      <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm rounded-xl p-3 text-xs border border-white/10">
-        <div className="text-white/70 font-medium mb-2">Zoom Level</div>
-        <div className="space-y-1">
-          {[0, 1, 2, 3].map((depth) => {
-            const isActive = getVisibleDepth(currentZoom) >= depth;
-            return (
-              <div key={depth} className="flex items-center gap-2">
-                <div
-                  className={`w-3 h-3 rounded-full transition-all ${isActive ? "" : "opacity-30"}`}
-                  style={{ backgroundColor: DEPTH_COLORS[depth] }}
+                <Scene
+                    nodes={nodes3D}
+                    edges={edges3D}
+                    selectedNodeId={selectedNodeId}
+                    selectedEdgeId={selectedEdgeId}
+                    onNodeClick={onNodeSelect}
                 />
-                <span
-                  className={`${isActive ? "text-white/80" : "text-white/30"}`}>
-                  {depth === 0 && "Core"}
-                  {depth === 1 && "Primary"}
-                  {depth === 2 && "Secondary"}
-                  {depth === 3 && "Detail"}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm rounded-xl p-3 text-xs border border-white/10">
-        <div className="text-white/70 font-medium mb-2">Vertical Axis</div>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-white/50">↑ Abstract / Foundational</span>
+                <OrbitControls
+                    enableRotate={true}
+                    enableZoom={true}
+                    enablePan={true}
+                    maxDistance={120}
+                    minDistance={10}
+                    autoRotate={false} // We handle rotation in Scene for precise control
+                />
+            </Canvas>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-white/50">↓ Concrete / Specific</span>
-        </div>
-      </div>
-
-      {/* Control Buttons */}
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-        {/* Mode Toggle */}
-        <div className="bg-black/70 backdrop-blur-sm rounded-xl p-1 border border-white/10 flex">
-          <button
-            onClick={() => setControlMode("rotate")}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-              controlMode === "rotate"
-                ? "bg-white/20 text-white"
-                : "text-white/50 hover:text-white/80"
-            }`}
-            title="Rotate mode">
-            🔄 Rotate
-          </button>
-          <button
-            onClick={() => setControlMode("pan")}
-            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-              controlMode === "pan"
-                ? "bg-white/20 text-white"
-                : "text-white/50 hover:text-white/80"
-            }`}
-            title="Pan mode">
-            ✋ Move
-          </button>
-        </div>
-
-        {/* Zoom Controls */}
-        <div className="bg-black/70 backdrop-blur-sm rounded-xl p-1 border border-white/10 flex flex-col">
-          <button
-            onClick={handleZoomIn}
-            className="px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all text-lg"
-            title="Zoom in">
-            +
-          </button>
-          <div className="h-px bg-white/10" />
-          <button
-            onClick={handleZoomOut}
-            className="px-3 py-2 text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-all text-lg"
-            title="Zoom out">
-            −
-          </button>
-        </div>
-      </div>
-
-      {/* Controls hint */}
-      <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-2 text-xs text-white/50 border border-white/10">
-        {controlMode === "rotate" ? "🔄 Drag to rotate" : "✋ Drag to pan"} •
-        Scroll to zoom
-      </div>
-    </div>
-  );
+    );
 }

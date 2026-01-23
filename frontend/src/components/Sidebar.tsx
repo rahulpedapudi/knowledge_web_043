@@ -31,7 +31,7 @@ export function Sidebar() {
   };
 
   return (
-    <div className="w-[260px] shrink-0 h-full bg-black/40 backdrop-blur-xl border-r border-white/10 flex flex-col md:flex">
+    <div className="w-[260px] shrink-0 h-full bg-[#13131f]/40 backdrop-blur-xl border-r border-white/5 flex flex-col md:flex shadow-2xl">
       {/* New Chat Button */}
       <div className="p-3">
         <button

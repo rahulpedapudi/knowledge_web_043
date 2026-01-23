@@ -17,8 +17,23 @@ function App() {
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [documentTitle, setDocumentTitle] = useState<string | null>(null);
 
+  // Global Parallax State
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({
+        x: (e.clientX / window.innerWidth) * 2 - 1,
+        y: (e.clientY / window.innerHeight) * 2 - 1,
+      });
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
 
   /* Routing Logic */
   useEffect(() => {
@@ -66,8 +81,8 @@ function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-[#111] text-white">
-        Loading...
+      <div className="flex items-center justify-center h-screen bg-[#0a0a0f] text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
       </div>
     );
   }
@@ -84,12 +99,36 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-[#111] overflow-hidden font-sans text-slate-200">
-      {/* Sidebar */}
-      <Sidebar />
+    <div className="relative flex h-screen bg-[#0a0a0f] overflow-hidden font-sans text-slate-200 selection:bg-purple-500/30">
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+      {/* GLOBAL BACKGROUND LAYERS (Behind content) */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0"
+        style={{
+          transform: `translate(${mousePos.x * -20}px, ${mousePos.y * -20}px)`,
+          transition: 'transform 0.1s ease-out'
+        }}
+      >
+        <div className="absolute top-[-20%] left-[20%] w-[50vw] h-[50vw] rounded-full bg-purple-600/10 blur-[120px] animate-pulse-glow" />
+        <div className="absolute bottom-[-10%] right-[10%] w-[45vw] h-[45vw] rounded-full bg-blue-600/10 blur-[100px] animate-float" />
+        <div className="absolute top-[40%] left-[-10%] w-[30vw] h-[30vw] rounded-full bg-pink-500/5 blur-[80px] animate-float-delayed" />
+      </div>
+
+      {/* Floating Particles */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+        <div
+          className="absolute top-[15%] right-[20%] w-20 h-20 border border-white/5 rounded-full animate-float-delayed"
+          style={{ transform: `translate(${mousePos.x * -40}px, ${mousePos.y * -40}px)` }}
+        />
+      </div>
+
+      {/* Sidebar (Z-Index 20 to sit above background but maybe glass?) */}
+      <div className="relative z-20 h-full flex-none">
+        <Sidebar />
+      </div>
+
+      {/* Main Content Area (Z-Index 10) */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative z-10 glass-content">
         {view === "upload" ? (
           <DocumentUpload onDocumentProcessed={handleDocumentProcessed} />
         ) : (
@@ -103,5 +142,7 @@ function App() {
     </div>
   );
 }
+
+import { Loader2 } from "lucide-react"; // Import missing Loader2
 
 export default App;
