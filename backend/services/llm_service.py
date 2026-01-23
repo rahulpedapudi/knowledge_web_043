@@ -26,6 +26,16 @@ Extraction Rules:
 3. Determine the relationship type: "direct" (both move same direction) or "inverse" (move opposite directions).
 4. Estimate a mathematical equation if possible, or provide a coefficient (positive for direct, negative for inverse).
 5. Extract specific sentences that contain the causal assertion.
+6. For each concept, determine:
+   - abstraction_level: 0-10 scale (0=very concrete/specific, 10=very abstract/general/foundational)
+   - depth_level: 0-3 scale for level-of-detail rendering:
+     * 0 = Core/root concepts (always visible, most fundamental)
+     * 1 = Primary concepts (visible at medium zoom)
+     * 2 = Secondary concepts (visible at close zoom)
+     * 3 = Detail concepts (only visible when very close)
+   - category: semantic grouping (e.g., "economics", "physics", "biology", "psychology")
+   - semantic_type: one of "variable" (measurable quantity), "law" (principle/rule), "process" (action/mechanism), "entity" (object/thing)
+   - parent_concepts: list of concept IDs that this concept is derived from or depends on (for clustering)
 
 Output Schema:
 {
@@ -37,7 +47,12 @@ Output Schema:
             "unit": "unit if variable (e.g., m/s, $)",
             "min_value": 0,
             "max_value": 100,
-            "default_value": 50
+            "default_value": 50,
+            "abstraction_level": 5,
+            "depth_level": 0,
+            "category": "physics",
+            "semantic_type": "variable",
+            "parent_concepts": []
         }
     ],
     "relationships": [
