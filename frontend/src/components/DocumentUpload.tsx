@@ -1,16 +1,7 @@
 import { useState, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Upload,
-  Sparkles,
-  Loader2,
-  Mic,
-  Headphones,
-  Plus,
-  ArrowUp,
-  Files,
-} from "lucide-react";
-import { uploadPdf, pasteText, createDemo } from "@/api/client";
+
+import { Upload, Loader2, Mic, Headphones, Plus, ArrowUp } from "lucide-react";
+import { uploadPdf, pasteText } from "@/api/client";
 import type { DocumentUploadResponse } from "@/types";
 
 interface DocumentUploadProps {

@@ -1,246 +1,105 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { Sidebar } from "@/components/Sidebar";
 import { DocumentUpload } from "@/components/DocumentUpload";
-import { ConceptGraph } from "@/components/ConceptGraph";
-import { RightPanel } from "@/components/RightPanel";
+import { KnowledgeGraphPage } from "@/components/KnowledgeGraphPage";
 import { AuthPage } from "@/components/AuthPage";
 import { GoogleCallback } from "@/components/GoogleCallback";
-import { Sidebar } from "@/components/Sidebar";
 import { useAuth } from "@/context/AuthContext";
-import { getDocumentGraph } from "@/api/client";
-import type {
-  DocumentUploadResponse,
-  GraphData,
-  RelationshipEdge,
-  D3Node,
-  ConceptNode,
-} from "@/types";
-import { ArrowLeft, BookOpen, Network, LogOut, User } from "lucide-react";
+import { getChatSession } from "@/api/client";
+import type { DocumentUploadResponse } from "@/types";
+import { useNavigate, useLocation } from "react-router-dom";
 
 type AppView = "upload" | "graph";
 
 function App() {
-  const { user, isLoading: authLoading, isAuthenticated, logout } = useAuth();
-
+  const { user, isLoading: loading } = useAuth();
   const [view, setView] = useState<AppView>("upload");
   const [documentId, setDocumentId] = useState<string | null>(null);
-  const [documentTitle, setDocumentTitle] = useState<string>("");
-  const [graphData, setGraphData] = useState<GraphData | null>(null);
-  const [selectedNode, setSelectedNode] = useState<ConceptNode | null>(null);
-  const [selectedEdge, setSelectedEdge] = useState<RelationshipEdge | null>(
-    null,
-  );
-  const [isLoadingGraph, setIsLoadingGraph] = useState(false);
-  const [stats, setStats] = useState<{
-    concepts: number;
-    relationships: number;
-  } | null>(null);
+  const [documentTitle, setDocumentTitle] = useState<string | null>(null);
 
-  const handleDocumentProcessed = async (response: DocumentUploadResponse) => {
-    setDocumentId(response.document_id);
-    setDocumentTitle(response.title);
-    setStats({
-      concepts: response.concepts_extracted,
-      relationships: response.relationships_found,
-    });
+  const navigate = useNavigate();
+  const location = useLocation();
 
-    // Load graph data
-    setIsLoadingGraph(true);
+  /* Routing Logic */
+  useEffect(() => {
+    const match = location.pathname.match(/^\/c\/([a-zA-Z0-9]+)$/);
+    if (match) {
+      const chatId = match[1];
+      loadChatSession(chatId);
+    } else if (location.pathname === "/") {
+      handleBackToUpload();
+    }
+  }, [location.pathname]);
+
+  const loadChatSession = async (chatId: string) => {
     try {
-      const data = await getDocumentGraph(response.document_id);
-      setGraphData(data);
+      const session = await getChatSession(chatId);
+      setDocumentId(session.document_id);
+      setDocumentTitle(session.title);
       setView("graph");
     } catch (err) {
-      console.error("Failed to load graph:", err);
-    } finally {
-      setIsLoadingGraph(false);
+      console.error("Failed to load session:", err);
+      // Optional: navigate home on error
     }
   };
 
-  const handleNodeClick = useCallback((node: D3Node) => {
-    setSelectedNode(node);
-    setSelectedEdge(null);
-  }, []);
-
-  const handleEdgeClick = useCallback((edge: RelationshipEdge) => {
-    setSelectedEdge(edge);
-    setSelectedNode(null);
-  }, []);
-
-  const handleBackToUpload = () => {
-    setView("upload");
-    setGraphData(null);
-    setDocumentId(null);
-    setSelectedNode(null);
-    setSelectedEdge(null);
-    setStats(null);
+  const handleDocumentProcessed = async (response: DocumentUploadResponse) => {
+    if (response.chat_id) {
+      navigate(`/c/${response.chat_id}`);
+    } else {
+      // Fallback
+      setDocumentId(response.document_id);
+      setDocumentTitle(response.title);
+      setView("graph");
+    }
   };
 
-  // Show loading spinner while checking auth
-  if (authLoading) {
+  const handleBackToUpload = () => {
+    if (location.pathname !== "/") {
+      navigate("/");
+      return;
+    }
+    setView("upload");
+    setDocumentId(null);
+    setDocumentTitle(null);
+  };
+
+  if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-900">
-        <div className="w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-[#111] text-white">
+        Loading...
       </div>
     );
   }
 
-  // Check if this is OAuth callback route
-  const isOAuthCallback = window.location.pathname === "/auth/callback";
-  if (isOAuthCallback) {
-    return <GoogleCallback />;
-  }
-
-  // Show auth page if not authenticated
-  if (!isAuthenticated) {
+  if (!user) {
     return <AuthPage />;
   }
 
-  // ... imports
-
-  if (view === "upload") {
-    return (
-      <div className="flex h-screen w-full bg-[#212121] text-white overflow-hidden font-sans">
-        <Sidebar />
-        <main className="flex-1 flex flex-col relative min-w-0">
-          <DocumentUpload onDocumentProcessed={handleDocumentProcessed} />
-        </main>
-      </div>
-    );
+  // Check for Google Callback
+  const searchParams = new URLSearchParams(window.location.search);
+  const token = searchParams.get("token");
+  if (token) {
+    return <GoogleCallback />;
   }
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-slate-800/50 border-b border-slate-700/50 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleBackToUpload}
-            className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back</span>
-          </button>
+    <div className="flex h-screen bg-[#111] overflow-hidden font-sans text-slate-200">
+      {/* Sidebar */}
+      <Sidebar />
 
-          <div className="h-6 w-px bg-slate-700" />
-
-          <div className="flex items-center gap-3">
-            <BookOpen className="w-5 h-5 text-blue-400" />
-            <div>
-              <h1 className="font-medium text-white">{documentTitle}</h1>
-              {stats && (
-                <p className="text-xs text-slate-500">
-                  {stats.concepts} concepts · {stats.relationships}{" "}
-                  relationships
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 rounded-lg">
-            <Network className="w-4 h-4 text-purple-400" />
-            <span className="text-sm text-slate-300">Causal Graph</span>
-          </div>
-
-          {/* User info */}
-          <div className="h-6 w-px bg-slate-700" />
-          <div className="flex items-center gap-2 px-3 py-1.5">
-            <User className="w-4 h-4 text-blue-400" />
-            <span className="text-sm text-slate-300">{user?.name}</span>
-          </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1 px-2 py-1.5 text-slate-400 hover:text-white transition-colors"
-            title="Logout">
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 relative overflow-hidden flex flex-row">
-        {isLoadingGraph ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-slate-400">Building concept graph...</p>
-            </div>
-          </div>
-        ) : graphData && graphData.concepts.length > 0 ? (
-          <>
-            <div className="flex-1 h-full relative">
-              <ConceptGraph
-                graphData={graphData}
-                onNodeClick={handleNodeClick}
-                onEdgeClick={handleEdgeClick}
-                selectedNodeId={selectedNode?.id}
-                selectedEdgeId={selectedEdge?.id}
-              />
-              {/* Instructions overlay (only when no panel is open - actually panel is always open now) */}
-              {/* Maybe keep it but adjust position or meaningfulness? Let's hide it if we have panels. */}
-
-              {!selectedNode && !selectedEdge && (
-                <div className="absolute bottom-4 right-4 bg-slate-800/80 backdrop-blur-sm rounded-lg p-4 text-sm max-w-xs pointer-events-none">
-                  <p className="text-slate-300 mb-2">
-                    <strong>How to use:</strong>
-                  </p>
-                  <ul className="text-slate-400 space-y-1 text-xs">
-                    <li>
-                      • Click a <span className="text-blue-400">node</span> to
-                      chat & see details
-                    </li>
-                    <li>
-                      • Click an <span className="text-purple-400">edge</span>{" "}
-                      for simulation
-                    </li>
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            <RightPanel
-              documentId={documentId}
-              selectedNode={selectedNode}
-              selectedEdge={selectedEdge}
-              graphData={graphData}
-            />
-          </>
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {view === "upload" ? (
+          <DocumentUpload onDocumentProcessed={handleDocumentProcessed} />
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <p className="text-slate-400 mb-4">
-                No causal relationships found in the text.
-              </p>
-              <button
-                onClick={handleBackToUpload}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors">
-                Try Again
-              </button>
-            </div>
-          </div>
+          <KnowledgeGraphPage
+            initialDocumentId={documentId}
+            initialDocumentTitle={documentTitle || undefined}
+            onNavigateHome={handleBackToUpload}
+          />
         )}
-
-        {/* Instructions overlay (only when no panel is open) */}
-        {graphData && !selectedNode && !selectedEdge && (
-          <div className="absolute bottom-4 right-4 bg-slate-800/80 backdrop-blur-sm rounded-lg p-4 text-sm max-w-xs">
-            <p className="text-slate-300 mb-2">
-              <strong>How to use:</strong>
-            </p>
-            <ul className="text-slate-400 space-y-1 text-xs">
-              <li>
-                • Click a <span className="text-blue-400">node</span> to see
-                concept details
-              </li>
-              <li>
-                • Click an <span className="text-purple-400">edge</span> to open
-                the simulation
-              </li>
-              <li>• Drag nodes to rearrange the graph</li>
-              <li>• Scroll to zoom, drag background to pan</li>
-            </ul>
-          </div>
-        )}
-      </main>
+      </div>
     </div>
   );
 }

@@ -40,6 +40,7 @@ export interface Document {
 
 export interface DocumentUploadResponse {
   document_id: string;
+  chat_id?: string;
   title: string;
   total_sentences: number;
   causal_sentences: number;

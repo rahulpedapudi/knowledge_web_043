@@ -2,20 +2,20 @@ import { useState } from "react";
 import { MessageSquare, Activity, MousePointer2 } from "lucide-react";
 import { SimulationPanel } from "./SimulationPanel";
 import { ChatPanel } from "./ChatPanel";
-import type { ConceptNode, RelationshipEdge, GraphData } from "@/types";
+import type { ConceptNode, RelationshipEdge } from "@/types";
 
 interface RightPanelProps {
   documentId: string | null;
   selectedNode: ConceptNode | null;
   selectedEdge: RelationshipEdge | null;
-  graphData: GraphData | undefined | null;
+  onClose: () => void;
 }
 
 export function RightPanel({
   documentId,
   selectedNode,
   selectedEdge,
-  graphData,
+  onClose,
 }: RightPanelProps) {
   const [activeTab, setActiveTab] = useState<"simulation" | "chat">(
     "simulation",
@@ -62,7 +62,7 @@ export function RightPanel({
           <SimulationPanel
             selectedNode={selectedNode}
             selectedEdge={selectedEdge}
-            onClose={() => {}}
+            onClose={onClose}
           />
         ) : (
           <div className="h-full">

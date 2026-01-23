@@ -87,6 +87,11 @@ export function SimulationPanel({
           <Zap className="w-5 h-5 text-yellow-400" />
           <h2 className="font-semibold text-white">Live Simulation</h2>
         </div>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-slate-700/50 rounded-lg transition-colors">
+          <X className="w-5 h-5 text-slate-400" />
+        </button>
       </div>
 
       {/* Content */}

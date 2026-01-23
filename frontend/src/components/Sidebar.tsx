@@ -1,15 +1,42 @@
-import {
-  MessageSquare,
-  Search,
-  Plus,
-} from "lucide-react";
+import { MessageSquare, Search, Plus, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getChatHistory } from "@/api/client";
+import { useNavigate } from "react-router-dom";
+
+interface ChatSession {
+  id: string;
+  title: string;
+  document_id: string;
+  created_at: string;
+}
 
 export function Sidebar() {
+  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      const history = await getChatHistory();
+      setChats(history);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="w-[260px] flex-shrink-0 h-full bg-black/40 backdrop-blur-xl border-r border-white/10 flex flex-col hidden md:flex">
+    <div className="w-[260px] shrink-0 h-full bg-black/40 backdrop-blur-xl border-r border-white/10 flex flex-col md:flex">
       {/* New Chat Button */}
       <div className="p-3">
-        <button className="flex items-center gap-3 w-full px-3 py-2 text-sm text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-3 w-full px-3 py-2 text-sm text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
           <div className="w-6 h-6 rounded-full bg-white text-black flex items-center justify-center">
             <Plus className="w-4 h-4" />
           </div>
@@ -30,20 +57,32 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* History Mock */}
+        {/* History */}
         <div className="space-y-1">
           <div className="px-3 text-xs font-medium text-white/50 mb-2">
-            Your chats
+            Recent Chats
           </div>
-          <button className="flex items-center gap-3 w-full px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors text-left truncate">
-            <span>Generative Knowledge Web</span>
-          </button>
-          <button className="flex items-center gap-3 w-full px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors text-left truncate">
-            <span>Intelligent Virtual Waiting...</span>
-          </button>
-          <button className="flex items-center gap-3 w-full px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors text-left truncate">
-            <span>What is ML Model</span>
-          </button>
+
+          {isLoading ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-4 h-4 text-white/30 animate-spin" />
+            </div>
+          ) : chats.length > 0 ? (
+            chats.map((chat) => (
+              <button
+                key={chat.id}
+                onClick={() => navigate(`/c/${chat.id}`)}
+                className="flex items-center gap-3 w-full px-3 py-2 text-sm text-white/90 hover:bg-white/10 rounded-lg transition-colors text-left truncate group">
+                <span className="truncate flex-1">
+                  {chat.title || "Untitled Chat"}
+                </span>
+              </button>
+            ))
+          ) : (
+            <div className="px-3 text-sm text-white/30 italic">
+              No recent chats
+            </div>
+          )}
         </div>
       </div>
 

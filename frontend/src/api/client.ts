@@ -176,3 +176,23 @@ export async function sendChatMessage(
   });
   return response.data;
 }
+
+export async function getChatHistory(): Promise<
+  Array<{ id: string; title: string; document_id: string; created_at: string }>
+> {
+  const response = await api.get("/chat/history");
+  return response.data;
+}
+
+export async function getChatSession(
+  chatId: string,
+): Promise<{
+  id: string;
+  title: string;
+  document_id: string;
+  created_at: string;
+  messages: any[];
+}> {
+  const response = await api.get(`/chat/${chatId}`);
+  return response.data;
+}
