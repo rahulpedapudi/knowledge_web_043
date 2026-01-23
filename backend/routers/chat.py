@@ -188,3 +188,17 @@ async def get_chat_session(chat_id: str):
         "created_at": chat.get("created_at"),
         "messages": chat.get("messages", [])
     }
+
+@router.delete("/{chat_id}")
+async def delete_chat_session(chat_id: str):
+    """Delete a chat session."""
+    db = get_database()
+    try:
+        result = await db.chats.delete_one({"_id": ObjectId(chat_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid chat ID")
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+
+    return {"status": "success", "message": "Chat session deleted"}

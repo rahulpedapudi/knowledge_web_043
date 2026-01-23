@@ -194,21 +194,32 @@ def analyze_text_with_llm(sentences: List[str], focus_concepts: List[str] = None
 
     model_name = "openai/gpt-oss-120b"  # Using a supported Groq model
 
-    # Choose prompt based on whether focus concepts are provided
+    # Choose prompt based on whether focus concepts are provided or if it's a topic request
     if focus_concepts and len(focus_concepts) > 0:
         system_prompt = FOCUSED_SYSTEM_PROMPT
         focus_str = ", ".join(focus_concepts)
         user_message = f"""FOCUS CONCEPTS (these are what the user wants to learn):
 {focus_str}
 
-Analyze this text and extract a knowledge graph centered on the above focus concepts:
+Analyze this text and extract a knowledge graph centered on the above focus concepts.
+Return your response as a JSON object.
 
 {full_text}"""
         print(
             f"Starting FOCUSED LLM analysis on {len(sentences)} sentences, focusing on: {focus_str}")
+
+    elif len(sentences) < 3 or len(full_text) < 200:
+        # Topic Generation Mode
+        system_prompt = TOPIC_GENERATION_PROMPT
+        user_message = f"""Generate a comprehensive knowledge graph about the following topic:
+{full_text}
+
+Return your response as a JSON object."""
+        print(f"Starting TOPIC GENERATION for: {full_text}")
+
     else:
         system_prompt = SYSTEM_PROMPT
-        user_message = f"Analyze this text and extract causal structure:\n\n{full_text}"
+        user_message = f"Analyze this text and extract causal structure. Return your response as a JSON object.\n\n{full_text}"
         print(
             f"Starting LLM analysis on {len(sentences)} sentences ({len(full_text)} chars)")
 
