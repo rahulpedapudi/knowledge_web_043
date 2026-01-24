@@ -10,9 +10,11 @@ from pydantic import BaseModel
 from bson import ObjectId
 import re
 
+from datetime import datetime
 from database import get_database
 from services.llm_service import chat_with_context
 from auth import get_current_user_id
+from models import ConceptChat
 
 router = APIRouter()
 
@@ -20,11 +22,35 @@ class ChatRequest(BaseModel):
     document_id: str
     concept_id: str
     message: str
-    history: List[Dict[str, str]] = []  # List of {"role": "user"|"assistant", "content": "..."}
+    # History is now optional/redundant for API input as we fetch from DB, 
+    # but kept for compatibility or stateless overrides if needed.
+    history: List[Dict[str, str]] = [] 
 
 class ChatResponse(BaseModel):
     response: str
     context_used: List[str]
+
+@router.get("/concept/{concept_id}")
+async def get_concept_chat_history(
+    concept_id: str,
+    document_id: str, # Required to verify ownership/context
+    user_id: str = Depends(get_current_user_id)
+):
+    """Get chat history for a specific concept node."""
+    db = get_database()
+    
+    # Find existing chat
+    chat = await db.concept_chats.find_one({
+        "concept_id": concept_id,
+        "document_id": document_id,
+        "user_id": user_id
+    })
+    
+    if not chat:
+        return []
+        
+    return chat.get("messages", [])
+
 
 @router.post("/message", response_model=ChatResponse)
 async def chat_message(
@@ -33,7 +59,7 @@ async def chat_message(
 ):
     """
     Send a message to the chat assistant for a specific concept.
-    Retrieves context chunks based on the concept label.
+    Saves history to persistent ConceptChat storage.
     """
     db = get_database()
     
@@ -59,6 +85,23 @@ async def chat_message(
         raise HTTPException(status_code=404, detail="Concept not found")
     
     concept_label = concept["label"]
+
+    # --- Fetch Persistent History ---
+    concept_chat = await db.concept_chats.find_one({
+        "concept_id": request.concept_id,
+        "document_id": request.document_id,
+        "user_id": user_id
+    })
+
+    # Prepare history for LLM context
+    # Use DB history if available, otherwise fall back to request history (or empty)
+    # We convert DB model format to LLM format
+    llm_history = []
+    if concept_chat and "messages" in concept_chat:
+        for msg in concept_chat["messages"]:
+            llm_history.append({"role": msg["role"], "content": msg["content"]})
+    elif request.history:
+        llm_history = request.history
     
     # 2. Get Relationship Context (Incoming and Outgoing)
     cursor = db.relationships.find({
@@ -174,7 +217,26 @@ async def chat_message(
     response = chat_with_context(
         context=context_str,
         message=request.message,
-        history=request.history
+        history=llm_history # Pass the full history we retrieved/constructed
+    )
+
+    # --- SAVE to Persistence ---
+    new_messages = [
+        {"role": "user", "content": request.message, "timestamp": datetime.utcnow()},
+        {"role": "assistant", "content": response, "timestamp": datetime.utcnow()}
+    ]
+
+    await db.concept_chats.update_one(
+        {
+            "concept_id": request.concept_id,
+            "document_id": request.document_id,
+            "user_id": user_id
+        },
+        {
+            "$push": {"messages": {"$each": new_messages}},
+            "$set": {"last_updated": datetime.utcnow()}
+        },
+        upsert=True
     )
     
     return ChatResponse(

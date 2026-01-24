@@ -224,3 +224,23 @@ class FlashcardSet(BaseModel):
 
     class Config:
         populate_by_name = True
+
+
+# ============ Chat Models ============
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ConceptChat(BaseModel):
+    id: str = Field(alias="_id")
+    document_id: str
+    concept_id: str
+    user_id: str
+    messages: list[ChatMessage] = []
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
+
+    class Config:
+        populate_by_name = True

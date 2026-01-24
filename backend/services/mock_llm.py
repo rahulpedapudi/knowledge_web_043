@@ -322,53 +322,54 @@ def calculate_simulation(
     Calculate the output value based on input and relationship.
     Uses the equation if available, otherwise uses coefficient.
     """
+    # Parse standardized equations
+    # Supports: +, -, *, /, exp(), log(), sqrt(), pow(), abs()
+    # Format: y = expression(x)
     if equation:
-        # Parse simple linear equations like "y = 0.34 * x + 92.8"
         try:
-            if "exp(" in equation:
-                # Exponential: y = 101.3 * exp(-x/8500)
-                import math
-                # Extract parameters
-                match = re.search(
-                    r'([\d.]+)\s*\*\s*exp\(([-\d./x]+)\)', equation)
-                if match:
-                    base = float(match.group(1))
-                    exp_part = match.group(2).replace('x', str(input_value))
-                    return base * math.exp(eval(exp_part))
-            elif "/" in equation and "x" in equation.split("/")[1]:
-                # Inverse proportion: y = 5 / x
-                match = re.search(r'([\d.]+)\s*/\s*x', equation)
-                if match:
-                    constant = float(match.group(1))
-                    # Avoid division by zero
-                    return constant / max(input_value, 0.1)
-            else:
-                # Linear: y = mx + b
-                match = re.search(
-                    r'y\s*=\s*([-\d.]+)\s*\*\s*x\s*([+-]\s*[\d.]+)?', equation)
-                if match:
-                    m = float(match.group(1))
-                    b = float(match.group(2).replace(
-                        " ", "")) if match.group(2) else 0
-                    return m * input_value + b
+            import math
+            
+            # 1. Normalize equation
+            # Remove "y =" prefix if present
+            eq_body = getattr(equation, "lower", lambda: str(equation))().split("=")[-1].strip()
+            
+            # 2. Replace logical tokens with python math
+            # Replace 'x' with actual value
+            # Note: We prioritize 'exp' over 'x' to avoid replacing occurrences inside function names
+            safe_env = {
+                "x": input_value,
+                "exp": math.exp,
+                "log": math.log,
+                "sqrt": math.sqrt,
+                "pow": math.pow,
+                "abs": abs,
+                "sin": math.sin,
+                "cos": math.cos,
+                "tan": math.tan,
+                "pi": math.pi,
+                "e": math.e
+            }
 
-                # Simple form: y = 100 - 0.1 * x
-                match = re.search(
-                    r'y\s*=\s*([\d.]+)\s*([+-])\s*([\d.]+)\s*\*\s*x', equation)
-                if match:
-                    b = float(match.group(1))
-                    sign = 1 if match.group(2) == '+' else -1
-                    m = sign * float(match.group(3))
-                    return b + m * input_value
-        except Exception:
-            pass
+            # 3. Safe Evaluation
+            # We use eval() with a restricted environment. 
+            # In a real production system, consider using `simpleeval` or a parser library.
+            # Here we restrict access to __builtins__ for basic safety.
+            result = eval(eq_body, {"__builtins__": {}}, safe_env)
+            
+            if isinstance(result, (int, float)):
+                return float(result)
 
-    # Fallback: simple linear relationship using coefficient
+        except Exception as e:
+            # Fallback for simple linear parsing if complex eval fails
+            print(f"Equation parsing failed for '{equation}': {str(e)}")
+
+    # Fallback to simple linear logic if no equation or parsing failed
     delta = input_value - source_default
-    if relationship_type == "direct":
-        return target_default + (coefficient * delta)
-    else:  # inverse
+    if relationship_type == "inverse":
         return target_default - (coefficient * delta)
+    
+    # Default direct
+    return target_default + (coefficient * delta)
 
 
 def generate_mock_topics(topics: list[str]) -> dict:

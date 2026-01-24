@@ -36,9 +36,14 @@ Extraction Rules:
    - abstraction_level: 0-10 scale (0=very concrete/specific, 10=very abstract/general/foundational)
    - depth_level: 0-3 scale as defined above.
    - priority: 1 (Main/Core), 2 (Secondary/Primary), 3 (Detail).
-   - category: semantic grouping (e.g., "economics", "physics", "biology", "psychology")
-   - semantic_type: one of "variable", "law", "process", "entity"
-   - parent_concepts: list of IDs of the IMMEDIATE parent level concept (e.g. Level 2 node should have Level 1 parent).
+   - category: semantic grouping (e.g., "economics", "physics", "biology", "psychology", "technology")
+   - semantic_type: one of "variable", "law", "process", "entity", "tradeoff"
+   - parent_concepts: list of IDs of the IMMEDIATE parent level concept.
+
+QUANTIFIABLE PROXIES (Crucial for Tech/Abstract topics):
+If a concept is abstract (e.g., "Complexity", "Efficiency", "Security"), you MUST assign it a concrete, measurable proxy unit (e.g., "0-100 Scale", "ms", "GB", "Requests/sec"). 
+Example: "Java Garbage Collection" -> Unit: "Pause Time (ms)".
+Example: "Code Complexity" -> Unit: "Cyclomatic Score".
 
 Output Schema:
 {
@@ -63,10 +68,10 @@ Output Schema:
         {
             "source": "source_concept_id",
             "target": "target_concept_id",
-            "type": "direct" | "inverse",
-            "description": "Explanation of the relationship",
-            "equation": "y = mx + b format (optional)", 
-            "coefficient": 1.0 (approximated strength)
+            "type": "direct" | "inverse" | "complex",
+            "description": "Explanation of the relationship/tradeoff",
+            "equation": "y = ... format (Required for simulations). Use standard math: +, -, *, /, exp(), log(). For Logic/Tradeoffs, approximate a function.", 
+            "coefficient": 1.0 (approximated strength multiplier)
         }
     ],
     "causal_sentences": ["exact sentence from text"]
@@ -141,6 +146,10 @@ Generation Rules:
    - Application relationships
 4. Ensure the graph is educational and helps the user learn progressively
 5. Include practical examples and real-world applications where relevant
+6. **SIMULATION READY**: For every major relationship, try to deduce a likely mathematical model or tradeoff function.
+   - If tech context (e.g. "Threads vs Latency"), model the inflection point.
+   - If physics, use the law.
+   - Always map abstract concepts to 0-100 scales if no specific unit exists.
 
 Output Schema:
 {
