@@ -21,13 +21,13 @@ interface DocumentUploadProps {
   onDocumentProcessed: (response: DocumentUploadResponse) => void;
 }
 
-type UploadStep = "upload" | "concepts" | "topic-only";
+type UploadStep = "upload" | "concepts" | "topic-only" | "pending-input";
 
 function ProcessingView() {
   const [step, setStep] = useState(0);
 
   const steps = [
-    { text: "Reading document...", icon: FileText },
+    { text: "Understanding user input...", icon: FileText },
     { text: "Analyzing structure...", icon: Sparkles },
     { text: "Extracting concepts...", icon: BrainCircuit },
     { text: "Building knowledge graph...", icon: Share2 },
@@ -145,8 +145,7 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     }
 
     setPendingFile(file);
-    // Skip concept step, proceed directly
-    await handleProcess(file);
+    setStep("pending-input");
   };
 
   const handleTopicOnlyProcess = async () => {
@@ -275,7 +274,87 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
       </div>
     );
   }
+  // Step 1.5: Pending Input Screen (For PDF Upload)
+  if (step === "pending-input" && _pendingFile) {
+    return (
+      <div className="flex-1 flex flex-col h-full bg-[#212121]">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button
+            onClick={handleBackToUpload}
+            className="flex items-center gap-2 text-sm text-white/70 hover:text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-colors">
+            <X className="w-4 h-4" />
+            <span>Cancel</span>
+          </button>
+        </div>
 
+        <div className="flex-1 flex flex-col items-center justify-center p-4 max-w-2xl mx-auto w-full relative">
+          <div className="mb-8 text-center">
+            <div className="mb-4 inline-flex justify-center">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-linear-to-br from-purple-500 to-blue-500">
+                <FileText className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-medium text-white mb-2">
+              {_pendingFile.name}
+            </h2>
+            <p className="text-white/50 text-sm">
+              PDF uploaded successfully. What would you like to focus on?
+            </p>
+          </div>
+
+          <div className="w-full mb-6">
+            <div className="bg-[#2f2f2f] rounded-2xl p-5 shadow-lg border border-white/5">
+              <label className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-400" />
+                Focus Topics (Optional)
+              </label>
+              <textarea
+                value={focusConcepts}
+                onChange={(e) => setFocusConcepts(e.target.value)}
+                placeholder="Enter specific topics you want to learn from this PDF, or leave empty to generate a graph for the entire document."
+                className="w-full bg-[#212121] border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder-white/40 resize-none focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/50 transition-all"
+                rows={4}
+              />
+              <p className="text-xs text-white/40 mt-2">
+                Leave empty to analyze the entire document.
+              </p>
+            </div>
+          </div>
+
+          <div className="w-full flex gap-3">
+            <button
+              onClick={() =>
+                handleProcess(
+                  _pendingFile,
+                  undefined,
+                  focusConcepts.split(",").filter((c) => c.trim()),
+                )
+              }
+              disabled={isLoading}
+              className="w-full py-4 px-6 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-lg shadow-purple-500/20">
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Processing PDF...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-5 h-5" />
+                  Generate Graph
+                </>
+              )}
+            </button>
+          </div>
+
+          {error && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500/90 text-white px-4 py-2 rounded-full text-sm">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
   // Step 1: Upload Screen
   return (
     <div className="flex-1 flex flex-col h-full bg-transparent overflow-y-auto">

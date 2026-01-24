@@ -404,33 +404,38 @@ function Scene({
         const target = nodes.find((n) => n.id === edge.target);
         if (!source || !target) return null;
 
-        const isConnectedToSelection =
-          highlightSet.has(source.id) && highlightSet.has(target.id);
         const isHovered = hoveredEdgeId === edge.id;
         const isSelected = selectedEdgeId === edge.id;
 
         // Spotlight Logic
-        // 1. If a node is hovered, dim everything NOT connected to it.
-        // 2. If an edge is hovered, highlight it.
-        // 3. Default state (no interactions): Low opacity for less clutter.
+        // 1. If a node is hovered, highlight its connections.
+        // 2. If NO node is hovered but a node is SELECTED, highlight its connections (Persistent Highlight).
+        // 3. Otherwise default state.
 
         let opacity = 0.2; // Default "clean" state
         let lineWidth = 1.0;
 
-        if (hoveredNodeId) {
-          const isConnectedToHovered =
-            edge.source === hoveredNodeId || edge.target === hoveredNodeId;
-          if (isConnectedToHovered) {
-            opacity = 1.0; // Spotlight active connections
+        // Effective focus is hover if present, otherwise selection
+        const effectiveFocusId = hoveredNodeId || selectedNodeId;
+
+        if (effectiveFocusId) {
+          const isConnectedToFocus =
+            edge.source === effectiveFocusId ||
+            edge.target === effectiveFocusId;
+
+          if (isConnectedToFocus) {
+            opacity = 1.0; // Spotlight
             lineWidth = 2.0;
           } else {
-            opacity = 0.05; // Fade out background
+            // If dragging or just viewing, dim unconnected
+            opacity = 0.05;
           }
-        } else if (isHovered || isSelected) {
+        }
+
+        // Edge specific hover/select overrides
+        if (isHovered || isSelected) {
           opacity = 1.0;
           lineWidth = 2.0;
-        } else if (isConnectedToSelection) {
-          opacity = 0.5;
         }
 
         // Brighter default edge color for dark background (kept from previous tweak)
@@ -440,8 +445,8 @@ function Scene({
 
         if (isHovered || isSelected) color = "#ffffff";
         else if (
-          hoveredNodeId &&
-          (edge.source === hoveredNodeId || edge.target === hoveredNodeId)
+          effectiveFocusId &&
+          (edge.source === effectiveFocusId || edge.target === effectiveFocusId)
         ) {
           color = "#ffffff"; // Also white/bright for spotlighted edges
         }

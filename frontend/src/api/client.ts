@@ -206,6 +206,18 @@ export async function sendChatMessage(
   return response.data;
 }
 
+export async function getConceptChat(
+  documentId: string,
+  conceptId: string,
+): Promise<
+  Array<{ role: "user" | "assistant"; content: string; timestamp: string }>
+> {
+  const response = await api.get(`/chat/concept/${conceptId}`, {
+    params: { document_id: documentId },
+  });
+  return response.data;
+}
+
 export async function getChatHistory(): Promise<
   Array<{ id: string; title: string; document_id: string; created_at: string }>
 > {

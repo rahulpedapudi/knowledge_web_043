@@ -49,6 +49,8 @@ export function SimulationPanel({
   );
 }
 
+import { calculateSimulation } from "@/api/client";
+
 function ActiveSimulation({
   state,
   onClose,
@@ -62,46 +64,36 @@ function ActiveSimulation({
 }) {
   const { edge, source, target } = state;
 
-  // Mock simulation state
   const [inputValue, setInputValue] = useState(50);
   const [outputValue, setOutputValue] = useState(50);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
-  // Calculate effect
+  // Debounce logic to prevent flooding API
   useEffect(() => {
     setIsAnimating(true);
-    const timer = setTimeout(() => setIsAnimating(false), 300);
+    setIsCalculating(true);
 
-    // Advanced Simulation Logic
-    // 1. Determine relationship strength (default 1.0)
-    let strength = 1.0;
-    if (
-      edge.description.toLowerCase().includes("strong") ||
-      edge.description.toLowerCase().includes("key")
-    )
-      strength = 1.5;
-    if (
-      edge.description.toLowerCase().includes("weak") ||
-      edge.description.toLowerCase().includes("minor")
-    )
-      strength = 0.5;
+    // Stop animation after short delay
+    const animTimer = setTimeout(() => setIsAnimating(false), 500);
 
-    // 2. Base calculation
-    let val = 50;
-    if (edge.relationship_type === "inverse") {
-      // Inverse: Input 0 -> Output 100, Input 100 -> Output 0
-      // With strength: stronger inverse means sharper drop
-      val = 100 - inputValue * strength;
-    } else {
-      // Direct: Input 0 -> Output 0
-      val = inputValue * strength;
-    }
+    // Call API with debounce
+    const apiTimer = setTimeout(async () => {
+      try {
+        const result = await calculateSimulation(edge.id, inputValue);
+        setOutputValue(result.output_value);
+      } catch (err) {
+        console.error("Simulation failed:", err);
+      } finally {
+        setIsCalculating(false);
+      }
+    }, 300); // 300ms debounce
 
-    // 3. Clamp
-    setOutputValue(Math.min(100, Math.max(0, val)));
-
-    return () => clearTimeout(timer);
-  }, [inputValue, edge]);
+    return () => {
+      clearTimeout(animTimer);
+      clearTimeout(apiTimer);
+    };
+  }, [inputValue, edge.id]);
 
   return (
     <div className="h-full flex flex-col p-6 animate-in fade-in slide-in-from-right-4 duration-300">
@@ -112,7 +104,7 @@ function ActiveSimulation({
             Live Simulation
           </h3>
           <span className="text-xs text-slate-500 uppercase tracking-wider font-medium mt-1">
-            Causal Analysis
+            AI-Powered Analysis
           </span>
         </div>
         <button
@@ -132,7 +124,8 @@ function ActiveSimulation({
               CAUSE (Input)
             </span>
             <span className="text-blue-400 font-mono font-bold">
-              {inputValue}%
+              {inputValue}
+              {source?.unit ? ` ${source.unit}` : "%"}
             </span>
           </div>
           <div
@@ -146,15 +139,15 @@ function ActiveSimulation({
 
           <input
             type="range"
-            min="0"
-            max="100"
+            min={source?.min_value ?? 0}
+            max={source?.max_value ?? 100}
             value={inputValue}
-            onChange={(e) => setInputValue(parseInt(e.target.value))}
+            onChange={(e) => setInputValue(parseFloat(e.target.value))}
             className="w-full h-2 bg-slate-700/50 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-colors"
           />
           <div className="flex justify-between text-[10px] uppercase font-bold text-slate-600 mt-2">
-            <span>Low Impact</span>
-            <span>High Impact</span>
+            <span>Min</span>
+            <span>Max</span>
           </div>
         </div>
 
@@ -168,16 +161,20 @@ function ActiveSimulation({
           <div className="bg-[#050510] border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 shadow-xl z-10">
             {edge.relationship_type === "direct" ? (
               <TrendingUp className="w-4 h-4 text-emerald-400" />
-            ) : (
+            ) : edge.relationship_type === "inverse" ? (
               <TrendingDown className="w-4 h-4 text-rose-400" />
+            ) : (
+              <Activity className="w-4 h-4 text-amber-400" />
             )}
             <span className="text-xs uppercase tracking-wider font-bold text-slate-300">
               {edge.relationship_type} Relation
             </span>
           </div>
-          <div className="text-[10px] text-slate-500 max-w-[200px] text-center bg-[#050510]/80 backdrop-blur px-2 py-1 rounded">
-            "{edge.description}"
-          </div>
+          {edge.equation && (
+            <div className="text-[10px] text-slate-500 max-w-[240px] text-center bg-[#050510]/80 backdrop-blur px-2 py-1 rounded font-mono mt-1">
+              Eq: {edge.equation}
+            </div>
+          )}
         </div>
 
         {/* Target Output */}
@@ -188,9 +185,10 @@ function ActiveSimulation({
               EFFECT (Output)
             </span>
             <span
-              className="text-purple-400 font-mono font-bold transition-all duration-300"
+              className={`text-purple-400 font-mono font-bold transition-all duration-300 ${isCalculating ? "opacity-50 blur-sm" : "opacity-100"}`}
               style={{ transform: isAnimating ? "scale(1.1)" : "scale(1)" }}>
-              {outputValue.toFixed(1)}%
+              {outputValue.toFixed(1)}
+              {target?.unit ? ` ${target.unit}` : "%"}
             </span>
           </div>
           <div
@@ -210,9 +208,10 @@ function ActiveSimulation({
                 <div key={i} className="w-[1px] h-full bg-white/5"></div>
               ))}
             </div>
+            {/* Use a relative width based on min/max of the target if available, else 0-100 clamp */}
             <div
               className="h-full bg-gradient-to-r from-purple-600 to-pink-500 transition-all duration-500 ease-out shadow-[0_0_15px_rgba(236,72,153,0.5)]"
-              style={{ width: `${outputValue}%` }}
+              style={{ width: `${Math.min(100, Math.max(0, outputValue))}%` }}
             />
           </div>
         </div>
