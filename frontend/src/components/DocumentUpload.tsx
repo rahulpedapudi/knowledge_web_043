@@ -161,12 +161,12 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
     await handleProcess(undefined, undefined, concepts);
   };
 
-  const handleTopicOnlyMode = () => {
-    setPendingFile(null);
-    setPendingText(null);
-    setStep("topic-only");
-    setError(null);
-  };
+  // const handleTopicOnlyMode = () => {
+  //   setPendingFile(null);
+  //   setPendingText(null);
+  //   setStep("topic-only");
+  //   setError(null);
+  // };
 
   const handleBackToUpload = () => {
     setStep("upload");

@@ -11,7 +11,7 @@ interface SimulationPanelProps {
 }
 
 export function SimulationPanel({
-  selectedNode,
+  // selectedNode,
   selectedEdge,
   sourceNode,
   targetNode,

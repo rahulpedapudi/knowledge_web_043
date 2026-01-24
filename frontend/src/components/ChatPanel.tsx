@@ -50,15 +50,13 @@ export function ChatPanel({
     let bulletPoints: string[] = [];
     let inCodeBlock = false;
     let codeContent = "";
-    let codeLanguage = "";
 
     const flushBulletPoints = () => {
       if (bulletPoints.length > 0) {
         parts.push(
           <ul
             key={`bullets-${parts.length}`}
-            className="list-disc list-inside mb-2 text-white/90 space-y-1"
-          >
+            className="list-disc list-inside mb-2 text-white/90 space-y-1">
             {bulletPoints.map((point, idx) => (
               <li key={idx} className="text-white/90">
                 {point}
@@ -102,15 +100,14 @@ export function ChatPanel({
         if (!inCodeBlock) {
           flushBulletPoints();
           inCodeBlock = true;
-          codeLanguage = line.replace("```", "").trim();
+          // codeLanguage = line.replace("```", "").trim();
           codeContent = "";
         } else {
           inCodeBlock = false;
           parts.push(
             <pre
               key={`code-${parts.length}`}
-              className="bg-black/40 border border-white/10 rounded p-3 mb-3 overflow-x-auto text-xs text-white/80"
-            >
+              className="bg-black/40 border border-white/10 rounded p-3 mb-3 overflow-x-auto text-xs text-white/80">
               <code>{codeContent}</code>
             </pre>,
           );
@@ -220,13 +217,11 @@ export function ChatPanel({
             key={index}
             className={`flex items-start gap-3 ${
               msg.role === "user" ? "flex-row-reverse" : ""
-            }`}
-          >
+            }`}>
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                 msg.role === "user" ? "bg-blue-600" : "bg-emerald-600"
-              }`}
-            >
+              }`}>
               {msg.role === "user" ? (
                 <UserIcon className="w-4 h-4 text-white" />
               ) : (
@@ -239,8 +234,7 @@ export function ChatPanel({
                 msg.role === "user"
                   ? "bg-blue-600 text-white rounded-tr-none"
                   : "bg-white/10 text-white/90 rounded-tl-none border border-white/5"
-              }`}
-            >
+              }`}>
               {msg.role === "assistant"
                 ? formatAssistantResponse(msg.content)
                 : msg.content}
@@ -275,8 +269,7 @@ export function ChatPanel({
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="p-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
+            className="p-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             <Send className="w-4 h-4" />
           </button>
         </form>
