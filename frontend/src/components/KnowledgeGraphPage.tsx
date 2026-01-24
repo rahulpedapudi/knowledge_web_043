@@ -36,27 +36,6 @@ export function KnowledgeGraphPage({
   );
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
-  const [visibleNodeIds, setVisibleNodeIds] = useState<Set<string>>(new Set());
-
-  // Calculate visible portion of the graph
-  const getVisibleGraphData = useCallback(() => {
-    if (!graphData) return { concepts: [], relationships: [] };
-
-    // If no nodes visible yet (initial load), show top connected nodes
-    if (visibleNodeIds.size === 0) {
-      // Return empty or wait for effect
-    }
-
-    const filteredConcepts = graphData.concepts.filter((c) =>
-      visibleNodeIds.has(c.id),
-    );
-    const filteredRelationships = graphData.relationships.filter(
-      (r) => visibleNodeIds.has(r.source) && visibleNodeIds.has(r.target),
-    );
-
-    return { concepts: filteredConcepts, relationships: filteredRelationships };
-  }, [graphData, visibleNodeIds]);
-
   // Derive neighbors for the RightPanel
   const selectedNodeNeighbors = useMemo(() => {
     if (!selectedNode || !graphData) return [];
@@ -85,26 +64,11 @@ export function KnowledgeGraphPage({
     setIsLoadingGraph(true);
     setSelectedNode(null);
     setSelectedEdge(null);
-    setVisibleNodeIds(new Set());
     try {
       const data = await getDocumentGraph(docId);
       setGraphData(data);
       setDocumentId(docId);
       setDocumentTitle(title);
-
-      // Initialize visible nodes with top connected ones
-      const connections = new Map<string, number>();
-      data.relationships.forEach((r) => {
-        connections.set(r.source, (connections.get(r.source) || 0) + 1);
-        connections.set(r.target, (connections.get(r.target) || 0) + 1);
-      });
-
-      const topNodes = [...connections.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 8)
-        .map(([id]) => id);
-
-      setVisibleNodeIds(new Set(topNodes));
     } catch (err) {
       console.error("Failed to load graph:", err);
     } finally {
@@ -148,58 +112,41 @@ export function KnowledgeGraphPage({
     setSelectedEdge(null);
   }, []);
 
-  // Double click - expand connected nodes
-  const handleNodeExpand = useCallback(
-    (node: D3Node) => {
-      if (!graphData) return;
-
-      // Find all neighbors
-      const neighbors = new Set<string>();
-      graphData.relationships.forEach((r) => {
-        if (r.source === node.id) neighbors.add(r.target);
-        if (r.target === node.id) neighbors.add(r.source);
-      });
-
-      setVisibleNodeIds((prev) => {
-        const next = new Set(prev);
-        neighbors.forEach((id) => next.add(id));
-        return next;
-      });
-
-      // Also select the node
-      handleNodeSelect(node);
-    },
-    [handleNodeSelect, graphData],
-  );
-
-  const [selectedSourceNode, setSelectedSourceNode] = useState<ConceptNode | null>(null);
-  const [selectedTargetNode, setSelectedTargetNode] = useState<ConceptNode | null>(null);
+  const [selectedSourceNode, setSelectedSourceNode] =
+    useState<ConceptNode | null>(null);
+  const [selectedTargetNode, setSelectedTargetNode] =
+    useState<ConceptNode | null>(null);
 
   // Click on edge - select for simulation
-  const handleEdgeSelect = useCallback((edge: D3Link) => {
-    // Resolve IDs
-    const sourceId = typeof edge.source === "string" ? edge.source : edge.source.id;
-    const targetId = typeof edge.target === "string" ? edge.target : edge.target.id;
+  const handleEdgeSelect = useCallback(
+    (edge: D3Link) => {
+      // Resolve IDs
+      const sourceId =
+        typeof edge.source === "string" ? edge.source : edge.source.id;
+      const targetId =
+        typeof edge.target === "string" ? edge.target : edge.target.id;
 
-    setSelectedEdge({
-      id: edge.id,
-      source: sourceId,
-      target: targetId,
-      relationship_type: edge.relationship_type,
-      description: edge.description,
-      equation: edge.equation,
-      has_simulation: edge.has_simulation,
-    });
-    setSelectedNode(null);
+      setSelectedEdge({
+        id: edge.id,
+        source: sourceId,
+        target: targetId,
+        relationship_type: edge.relationship_type,
+        description: edge.description,
+        equation: edge.equation,
+        has_simulation: edge.has_simulation,
+      });
+      setSelectedNode(null);
 
-    // Find full node objects for context
-    if (graphData) {
-      const sNode = graphData.concepts.find(c => c.id === sourceId) || null;
-      const tNode = graphData.concepts.find(c => c.id === targetId) || null;
-      setSelectedSourceNode(sNode);
-      setSelectedTargetNode(tNode);
-    }
-  }, [graphData]);
+      // Find full node objects for context
+      if (graphData) {
+        const sNode = graphData.concepts.find((c) => c.id === sourceId) || null;
+        const tNode = graphData.concepts.find((c) => c.id === targetId) || null;
+        setSelectedSourceNode(sNode);
+        setSelectedTargetNode(tNode);
+      }
+    },
+    [graphData],
+  );
 
   // Click on background - deselect all
   const handleBackgroundClick = useCallback(() => {
@@ -208,8 +155,6 @@ export function KnowledgeGraphPage({
     setSelectedSourceNode(null);
     setSelectedTargetNode(null);
   }, []);
-
-  const visibleGraphData = getVisibleGraphData();
 
   return (
     <div className="flex h-full w-full bg-[#050510] text-white overflow-hidden">
@@ -235,11 +180,10 @@ export function KnowledgeGraphPage({
               <p className="text-white/50">Building knowledge graph...</p>
             </div>
           </div>
-        ) : graphData && visibleGraphData.concepts.length > 0 ? (
+        ) : graphData && graphData.concepts.length > 0 ? (
           <ConceptGraph3D
             graphData={graphData}
             onNodeSelect={handleNodeSelect}
-            onNodeExpand={handleNodeExpand}
             onEdgeSelect={handleEdgeSelect}
             selectedNodeId={selectedNode?.id}
             selectedEdgeId={selectedEdge?.id}

@@ -7,6 +7,8 @@ import {
   Billboard,
 } from "@react-three/drei";
 import * as THREE from "three";
+import { useSpring, animated } from "@react-spring/three";
+import { useDrag } from "@use-gesture/react";
 import type { GraphData, ConceptNode, D3Link } from "@/types";
 import {
   Database,
@@ -20,6 +22,8 @@ import {
   DollarSign,
   PieChart,
   Zap,
+  Play,
+  Pause,
 } from "lucide-react";
 
 // ============ Types ============
@@ -40,7 +44,6 @@ interface Node3D extends ConceptNode {
 interface ConceptGraph3DProps {
   graphData: GraphData;
   onNodeSelect: (node: ConceptNode) => void;
-  onNodeExpand: (node: ConceptNode) => void;
   onEdgeSelect: (edge: D3Link) => void;
   selectedNodeId?: string | null;
   selectedEdgeId?: string | null;
@@ -95,6 +98,8 @@ function ConnectionLine({
   end,
   color,
   isActive,
+  opacity,
+  lineWidth,
   onHover,
   onUnhover,
   onClick,
@@ -103,6 +108,8 @@ function ConnectionLine({
   end: [number, number, number];
   color: string;
   isActive: boolean;
+  opacity?: number;
+  lineWidth?: number;
   onHover: () => void;
   onUnhover: () => void;
   onClick: () => void;
@@ -120,9 +127,9 @@ function ConnectionLine({
         end={end}
         mid={mid}
         color={isActive ? "#ffffff" : color}
-        lineWidth={isActive ? 3 : 1}
+        lineWidth={lineWidth || (isActive ? 3 : 1.5)}
         transparent
-        opacity={isActive ? 0.9 : 0.6}
+        opacity={opacity !== undefined ? opacity : isActive ? 1.0 : 0.7}
         onPointerOver={(e) => {
           e.stopPropagation();
           onHover();
@@ -167,12 +174,20 @@ function NodeCard({
   isHighlighted,
   onClick,
   calculatedPosition,
+  onNodeDragStart,
+  onNodeDragEnd,
+  onPointerOver,
+  onPointerOut,
 }: {
   node: Node3D;
   isSelected: boolean;
   isHighlighted: boolean;
   onClick: () => void;
   calculatedPosition: [number, number, number];
+  onNodeDragStart: () => void;
+  onNodeDragEnd: () => void;
+  onPointerOver: () => void;
+  onPointerOut: () => void;
 }) {
   const Icon = node.icon || Box;
   const isCenter = node.side === "center";
@@ -186,90 +201,145 @@ function NodeCard({
       .reduce((acc, char) => acc + char.charCodeAt(0), 0);
     gradient = VIBRANT_COLORS[hash % VIBRANT_COLORS.length];
   } else {
-    gradient = "from-[#1a1b26] to-[#24283b]";
+    gradient = "from-[#1e293b] to-[#334155]"; // Lighter slate for better visibility
   }
 
+  // Spring physics for "sticky fluidy" feel
+  const [spring, api] = useSpring(() => ({
+    position: calculatedPosition,
+    scale: isSelected ? 1.25 : isHighlighted ? 1.1 : 1,
+    config: { mass: 1, tension: 170, friction: 26 }, // Sticky/Fluid physics
+  }));
+
+  // Update spring target when layout changes (unless dragging)
+  useEffect(() => {
+    api.start({
+      position: calculatedPosition,
+      scale: isSelected ? 1.25 : isHighlighted ? 1.1 : 1,
+    });
+  }, [calculatedPosition, isSelected, isHighlighted, api]);
+
+  // Drag logic
+  const bind = useDrag(
+    ({ active, movement: [x, y], memo = spring.position.get() }) => {
+      if (active) {
+        onNodeDragStart();
+        // Convert screen drag to 3D space rough approximation or just screen plane
+        // Simple 3D drag: scale movement by factor
+        const factor = 0.1;
+        api.start({
+          position: [memo[0] + x * factor, memo[1] - y * factor, memo[2]],
+          immediate: true,
+        });
+      } else {
+        onNodeDragEnd();
+        // Snap back to orbit or stay? User said "movable", so maybe stay?
+        // But layout is orbital. Let's snap back for "sticky" feel as per "sticky fluidy".
+        // Use calculatedPosition for snap back.
+        api.start({ position: calculatedPosition });
+      }
+      return memo;
+    },
+    { delay: true },
+  );
+
   return (
-    <Billboard
-      position={calculatedPosition}
-      follow={true}
-      lockX={false}
-      lockY={false}
-      lockZ={false}>
-      <Html transform position={[0, 0, 0]} center zIndexRange={[100, 0]}>
-        <div
-          onClick={onClick}
-          className={`
+    // @ts-ignore - animated.group works but TS might complain about Billboard prop mapping if wrapped directly
+    <animated.group position={spring.position} scale={spring.scale} {...bind()}>
+      <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
+        <Html
+          transform
+          position={[0, 0, 0]}
+          center
+          zIndexRange={[100, 0]}
+          style={{ pointerEvents: "none" }}>
+          <div
+            onPointerOver={(e) => {
+              e.stopPropagation();
+              onPointerOver();
+            }}
+            onPointerOut={(e) => {
+              e.stopPropagation();
+              onPointerOut();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+            className={`
                         relative group cursor-pointer transition-all duration-300
-                        ${isSelected ? "scale-125 z-50" : isHighlighted ? "scale-110 z-40" : "hover:scale-110 z-10"}
+                        pointer-events-auto select-none
                         ${!isSelected && !isHighlighted ? "opacity-90" : "opacity-100"}
                     `}>
-          {(isSelected || isHighlighted || isCenter) && (
-            <div
-              className={`
-                            absolute -inset-6 rounded-full blur-2xl animate-pulse
-                            bg-gradient-to-r ${gradient}
-                            ${isCenter ? "opacity-40" : "opacity-20"}
-                        `}
-            />
-          )}
-
-          <div
-            className={`
-                        flex flex-col items-center justify-center
-                        backdrop-blur-xl border shadow-2xl transition-all duration-300
-                        ${
-                          isCenter
-                            ? "w-48 h-48 rounded-full border-purple-500/50 bg-[#13131f]/90"
-                            : "w-32 h-32 rounded-3xl"
-                        }
-                        ${
-                          !isCenter &&
-                          (isSelected
-                            ? "border-white/60 bg-[#1e1e2e]/95"
-                            : "border-white/10 bg-[#0a0a0f]/80 hover:border-white/30 hover:bg-[#13131f]/90")
-                        }
-                    `}>
-            <div
-              className={`
-                            flex items-center justify-center mb-3 text-white shadow-lg
-                            ${
-                              isCenter
-                                ? `w-20 h-20 rounded-full bg-gradient-to-br ${gradient}`
-                                : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient}`
-                            }
-                        `}>
-              <Icon className={`${isCenter ? "w-10 h-10" : "w-7 h-7"}`} />
-            </div>
-
-            <div className="px-3 text-center w-full">
-              <span
+            {(isSelected || isHighlighted || isCenter) && (
+              <div
                 className={`
-                                block font-bold text-white leading-tight truncate w-full
-                                ${isCenter ? "text-xl tracking-wide" : "text-sm"}
-                                drop-shadow-md
-                            `}>
-                {node.label}
-              </span>
+                              absolute -inset-6 rounded-full blur-2xl animate-pulse
+                              bg-gradient-to-r ${gradient}
+                              ${isCenter ? "opacity-40" : "opacity-20"}
+                          `}
+              />
+            )}
 
-              {node.variant === "vibrant" && node.min_value !== undefined && (
-                <div
+            <div
+              className={`
+                          flex flex-col items-center justify-center
+                          backdrop-blur-xl border shadow-2xl transition-all duration-300
+                          ${
+                            isCenter
+                              ? "w-56 h-56 rounded-full border-purple-500/50 bg-[#1e1b4b]/95" // Even larger center
+                              : "w-48 h-48 rounded-full" // Circular Shape
+                          }
+                          ${
+                            !isCenter &&
+                            (isSelected
+                              ? "border-white/80 bg-[#1e293b]/95"
+                              : "border-white/20 bg-[#0f172a]/90 hover:border-white/40 hover:bg-[#1e293b]/95")
+                          }
+                      `}>
+              <div
+                className={`
+                              flex items-center justify-center mb-3 text-white shadow-lg
+                              ${
+                                isCenter
+                                  ? `w-20 h-20 rounded-full bg-linear-to-br ${gradient}`
+                                  : `w-14 h-14 rounded-full bg-linear-to-br ${gradient}`
+                              }
+                          `}>
+                <Icon className={`${isCenter ? "w-10 h-10" : "w-7 h-7"}`} />
+              </div>
+
+              <div className="px-3 text-center w-full">
+                <span
                   className={`
-                                    mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium
-                                    bg-gradient-to-r ${gradient} text-white shadow-sm
-                                `}>
-                  $
-                  {(
-                    (node.min_value + (node.max_value || 0)) /
-                    2
-                  ).toLocaleString()}
-                </div>
-              )}
+                                  block font-bold text-white leading-tight w-full
+                                  ${isCenter ? "text-3xl tracking-wide" : "text-xl"}
+                                  drop-shadow-xl break-words
+                              `}>
+                  {node.label}
+                </span>
+
+                {node.variant === "vibrant" &&
+                  node.min_value !== undefined &&
+                  (node.min_value + (node.max_value || 0)) / 2 > 0 && (
+                    <div
+                      className={`
+                                      mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium
+                                      bg-gradient-to-r ${gradient} text-white shadow-sm
+                                  `}>
+                      $
+                      {(
+                        (node.min_value + (node.max_value || 0)) /
+                        2
+                      ).toLocaleString()}
+                    </div>
+                  )}
+              </div>
             </div>
           </div>
-        </div>
-      </Html>
-    </Billboard>
+        </Html>
+      </Billboard>
+    </animated.group>
   );
 }
 
@@ -280,6 +350,7 @@ function Scene({
   selectedEdgeId,
   onNodeClick,
   onEdgeClick,
+  isPaused,
 }: {
   nodes: Node3D[];
   edges: any[];
@@ -287,17 +358,20 @@ function Scene({
   selectedEdgeId: string | null | undefined;
   onNodeClick: (n: Node3D) => void;
   onEdgeClick: (e: D3Link) => void;
+  isPaused: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [, setAnimatedNodes] = useState<Node3D[]>(nodes);
 
+  // Update view when nodes/edges change (e.g. expansion)
   useEffect(() => {
     setAnimatedNodes(nodes);
   }, [nodes]);
 
   useFrame((_state, delta) => {
-    if (!selectedNodeId && !selectedEdgeId) {
+    if (!selectedNodeId && !selectedEdgeId && !isPaused) {
       if (groupRef.current) {
         groupRef.current.rotation.y += delta * 0.15;
       }
@@ -333,16 +407,44 @@ function Scene({
         const isConnectedToSelection =
           highlightSet.has(source.id) && highlightSet.has(target.id);
         const isHovered = hoveredEdgeId === edge.id;
-
-        let color = "#4b5563";
-        if (target.variant === "vibrant" || source.variant === "vibrant")
-          color = "#a855f7";
-
         const isSelected = selectedEdgeId === edge.id;
-        // If hovered or selected, white. If connected to selection, also white but maybe different?
-        // User wants "highlighted properly".
+
+        // Spotlight Logic
+        // 1. If a node is hovered, dim everything NOT connected to it.
+        // 2. If an edge is hovered, highlight it.
+        // 3. Default state (no interactions): Low opacity for less clutter.
+
+        let opacity = 0.2; // Default "clean" state
+        let lineWidth = 1.0;
+
+        if (hoveredNodeId) {
+          const isConnectedToHovered =
+            edge.source === hoveredNodeId || edge.target === hoveredNodeId;
+          if (isConnectedToHovered) {
+            opacity = 1.0; // Spotlight active connections
+            lineWidth = 2.0;
+          } else {
+            opacity = 0.05; // Fade out background
+          }
+        } else if (isHovered || isSelected) {
+          opacity = 1.0;
+          lineWidth = 2.0;
+        } else if (isConnectedToSelection) {
+          opacity = 0.5;
+        }
+
+        // Brighter default edge color for dark background (kept from previous tweak)
+        let color = "#94a3b8"; // slate-400
+        if (target.variant === "vibrant" || source.variant === "vibrant")
+          color = "#c084fc"; // purple-400 (brighter)
+
         if (isHovered || isSelected) color = "#ffffff";
-        else if (isConnectedToSelection) color = "#e2e8f0"; // Slightly dimmer than active hover
+        else if (
+          hoveredNodeId &&
+          (edge.source === hoveredNodeId || edge.target === hoveredNodeId)
+        ) {
+          color = "#ffffff"; // Also white/bright for spotlighted edges
+        }
 
         return (
           <ConnectionLine
@@ -350,7 +452,9 @@ function Scene({
             start={source.position}
             end={target.position}
             color={color}
-            isActive={isConnectedToSelection || isHovered || isSelected}
+            isActive={opacity > 0.5} // Used for animation state if needed
+            lineWidth={lineWidth} // Pass calculated width
+            opacity={opacity} // Pass opacity directly (if props allow, see next step if types fail)
             onHover={() => setHoveredEdgeId(edge.id)}
             onUnhover={() => setHoveredEdgeId(null)}
             onClick={() => onEdgeClick(edge)}
@@ -363,9 +467,18 @@ function Scene({
           key={node.id}
           node={node}
           isSelected={node.id === selectedNodeId}
-          isHighlighted={highlightSet.has(node.id)}
+          isHighlighted={
+            highlightSet.has(node.id) ||
+            (hoveredNodeId !== null && hoveredNodeId === node.id)
+          } // Highlight hovered node too
           onClick={() => onNodeClick(node)}
           calculatedPosition={node.position}
+          onNodeDragStart={() => {
+            /* Optional: Pause rotation while dragging */
+          }}
+          onNodeDragEnd={() => {}}
+          onPointerOver={() => setHoveredNodeId(node.id)}
+          onPointerOut={() => setHoveredNodeId(null)}
         />
       ))}
     </group>
@@ -375,34 +488,83 @@ function Scene({
 export function ConceptGraph3D({
   graphData,
   onNodeSelect,
-  // onNodeExpand,
   onEdgeSelect,
   selectedNodeId,
   selectedEdgeId,
   onBackgroundClick,
 }: ConceptGraph3DProps) {
-  // Orbital Layout Algorithm
-  const { nodes3D, edges3D } = useMemo(() => {
+  // State for expanded nodes (LOD)
+  // Initially empty, or could pre-expand root?
+  // User wants level 0 & 1 visible by default.
+  // Clicking level 1 expands to show connected level 2.
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isPaused, setIsPaused] = useState(false);
+  const [initialNodeIds, setInitialNodeIds] = useState<Set<string>>(new Set());
+
+  // Reset expansion and calculate INITIAL view when graph data changes
+  useEffect(() => {
+    setExpandedNodeIds(new Set());
+
+    // Calculate initial visible set ONCE
+    const ids = new Set<string>();
+    graphData.concepts.forEach((node) => {
+      // User Request: Only show up to Priority 3
+      if (node.priority !== undefined && node.priority > 3) return;
+
+      const isPriority1 = node.priority === 1;
+      const isCore = (node.depth_level ?? 0) === 0;
+      // Fallback for legacy: priority undefined AND depth 1
+      const isLegacyPrimary =
+        node.priority === undefined && node.depth_level === 1;
+
+      if (isPriority1 || isCore || isLegacyPrimary) {
+        ids.add(node.id);
+      }
+    });
+
+    // Safety Fallback: If nothing is visible, show top 5 concepts
+    if (ids.size === 0 && graphData.concepts.length > 0) {
+      graphData.concepts.slice(0, 5).forEach((c) => ids.add(c.id));
+    }
+
+    setInitialNodeIds(ids);
+  }, [graphData]);
+
+  // Handle local node click for expansion + prop callback
+  const handleNodeClick = (node: ConceptNode) => {
+    // Expand this node
+    const newExpanded = new Set(expandedNodeIds);
+    newExpanded.add(node.id);
+    setExpandedNodeIds(newExpanded);
+
+    // Call original handler
+    onNodeSelect(node);
+  };
+
+  // 1. STABLE LAYOUT ALGORITHM (Positions dependent ONLY on graphData)
+  const layoutNodes = useMemo(() => {
     const nodes: Node3D[] = [];
 
-    const rootNodes = graphData.concepts.filter(
-      (c) => (c.depth_level ?? 0) === 0,
-    );
-    const root = rootNodes.length > 0 ? rootNodes[0] : graphData.concepts[0];
+    // Use all nodes for layout to ensure stability
+    const allConcepts = graphData.concepts;
+    const rootNodes = allConcepts.filter((c) => (c.depth_level ?? 0) === 0);
+    const root = rootNodes.length > 0 ? rootNodes[0] : allConcepts[0];
 
-    if (!root) return { nodes3D: [], edges3D: [] };
+    if (!root) return [];
 
     nodes.push({
       ...root,
       position: [0, 0, 0],
       color: "#ffffff",
-      size: 1.5,
+      size: 2.0,
       icon: Zap,
       side: "center",
       variant: "glass",
     });
 
-    const remainders = graphData.concepts.filter((c) => c.id !== root.id);
+    const remainders = allConcepts.filter((c) => c.id !== root.id);
 
     const innerOrbitNodes: ConceptNode[] = [];
     const outerOrbitNodes: ConceptNode[] = [];
@@ -426,11 +588,20 @@ export function ConceptGraph3D({
       innerOrbitNodes.push(...outerOrbitNodes.splice(0, half));
     }
 
-    const innerRadius = 16;
+    const innerRadius = 18;
     const innerStep = (Math.PI * 2) / Math.max(1, innerOrbitNodes.length);
 
     innerOrbitNodes.forEach((node, i) => {
       const angle = i * innerStep;
+      // Size based on importance
+      let size = 0.8;
+      if (node.priority === 1) size = 1.8;
+      else if (node.priority === 2) size = 1.2;
+      else if (node.priority === undefined) {
+        if (node.depth_level === 0) size = 1.8;
+        else if (node.depth_level === 1) size = 1.2;
+      }
+
       nodes.push({
         ...node,
         position: [
@@ -439,19 +610,25 @@ export function ConceptGraph3D({
           Math.sin(angle) * innerRadius,
         ],
         color: "#1f293b",
-        size: 1,
+        size: size,
         side: "left",
         variant: "dark",
         icon: getNodeIcon(node),
       });
     });
 
-    const outerRadius = 28;
+    const outerRadius = 32;
     const outerStep = (Math.PI * 2) / Math.max(1, outerOrbitNodes.length);
 
     outerOrbitNodes.forEach((node, i) => {
       const angle = i * outerStep + Math.PI / 4;
       const y = Math.sin(angle * 2) * 8;
+
+      let size = 0.7;
+      if (node.priority === 2)
+        size = 1.0; // Priority 2 in outer orbit
+      else if (node.priority === undefined && node.depth_level === 1)
+        size = 1.0;
 
       nodes.push({
         ...node,
@@ -461,15 +638,46 @@ export function ConceptGraph3D({
           Math.sin(angle) * outerRadius,
         ],
         color: "#ff00ff",
-        size: 1,
+        size: size,
         side: "right",
         variant: "vibrant",
         icon: getNodeIcon(node),
       });
     });
 
-    return { nodes3D: nodes, edges3D: graphData.relationships };
+    return nodes;
   }, [graphData]);
+
+  // 2. VISIBILITY FILTERING (Depends on layout + expanded state)
+  const { nodes3D, edges3D } = useMemo(() => {
+    // Determine which IDs are visible
+    // Start with the INITIAL set (so they don't disappear)
+    const visibleNodeIds = new Set<string>(initialNodeIds);
+
+    // Add neighbors of expanded nodes
+    expandedNodeIds.forEach((expandedId) => {
+      // Find all edges connected to this expanded node
+      graphData.relationships.forEach((rel) => {
+        let neighborId = null;
+        if (rel.source === expandedId) neighborId = rel.target;
+        if (rel.target === expandedId) neighborId = rel.source;
+
+        if (neighborId) {
+          // Allow revealing ANY neighbor on click (Deep Dive)
+          visibleNodeIds.add(neighborId);
+        }
+      });
+    });
+
+    // Filter the PRE-CALCULATED layoutNodes
+    const visibleNodes = layoutNodes.filter((n) => visibleNodeIds.has(n.id));
+
+    const visibleEdges = graphData.relationships.filter(
+      (e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target),
+    );
+
+    return { nodes3D: visibleNodes, edges3D: visibleEdges };
+  }, [graphData, layoutNodes, expandedNodeIds, initialNodeIds]);
 
   return (
     <div className="w-full h-full relative bg-transparent">
@@ -480,8 +688,8 @@ export function ConceptGraph3D({
           if (onBackgroundClick) onBackgroundClick();
         }}>
         <fog attach="fog" args={["#050510", 40, 150]} />
-        <ambientLight intensity={0.5} />
-        <pointLight position={[0, 20, 0]} intensity={2} color="#ffffff" />
+        <ambientLight intensity={0.8} />
+        <pointLight position={[0, 20, 0]} intensity={2.5} color="#ffffff" />
         <pointLight position={[20, 0, 20]} intensity={1} color="#a855f7" />
         <pointLight position={[-20, 0, -20]} intensity={1} color="#3b82f6" />
 
@@ -490,8 +698,9 @@ export function ConceptGraph3D({
           edges={edges3D}
           selectedNodeId={selectedNodeId}
           selectedEdgeId={selectedEdgeId}
-          onNodeClick={onNodeSelect}
+          onNodeClick={handleNodeClick}
           onEdgeClick={onEdgeSelect}
+          isPaused={isPaused}
         />
 
         <OrbitControls
@@ -503,6 +712,20 @@ export function ConceptGraph3D({
           autoRotate={false}
         />
       </Canvas>
+
+      {/* Animation Control */}
+      <div className="absolute bottom-6 right-6 z-10">
+        <button
+          onClick={() => setIsPaused(!isPaused)}
+          className="p-3 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 rounded-full text-white/80 transition-all active:scale-95"
+          title={isPaused ? "Resume Rotation" : "Pause Rotation"}>
+          {isPaused ? (
+            <Play className="w-5 h-5 fill-current" />
+          ) : (
+            <Pause className="w-5 h-5 fill-current" />
+          )}
+        </button>
+      </div>
     </div>
   );
 }
