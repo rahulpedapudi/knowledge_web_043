@@ -4,7 +4,6 @@ import {
   Compass,
   MousePointer2,
   ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { ExplorePanel } from "./ExplorePanel";
 import { ChatPanel } from "./ChatPanel";
@@ -41,7 +40,8 @@ export function RightPanel({
           <button
             onClick={onToggle}
             className="w-full p-2 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            title="Expand panel">
+            title="Expand panel"
+          >
             <ChevronLeft className="w-5 h-5" />
           </button>
         </div>
@@ -57,7 +57,8 @@ export function RightPanel({
                 ? "text-blue-400 bg-white/10"
                 : "text-white/50 hover:text-white hover:bg-white/10"
             }`}
-            title="Explore">
+            title="Explore"
+          >
             <Compass className="w-5 h-5" />
           </button>
           <button
@@ -70,7 +71,8 @@ export function RightPanel({
                 ? "text-emerald-400 bg-white/10"
                 : "text-white/50 hover:text-white hover:bg-white/10"
             }`}
-            title="Chat">
+            title="Chat"
+          >
             <MessageSquare className="w-5 h-5" />
           </button>
         </div>
@@ -84,18 +86,13 @@ export function RightPanel({
       {/* Tabs */}
       <div className="flex border-b border-white/10 shrink-0">
         <button
-          onClick={onToggle}
-          className="p-3 text-white/50 hover:text-white hover:bg-white/10 transition-colors"
-          title="Collapse panel">
-          <ChevronRight className="w-4 h-4" />
-        </button>
-        <button
           onClick={() => setActiveTab("explore")}
           className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
             activeTab === "explore"
               ? "text-blue-400"
               : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}>
+          }`}
+        >
           <Compass className="w-4 h-4" />
           Explore
           {activeTab === "explore" && (
@@ -108,7 +105,8 @@ export function RightPanel({
             activeTab === "chat"
               ? "text-emerald-400"
               : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}>
+          }`}
+        >
           <MessageSquare className="w-4 h-4" />
           Chat
           {activeTab === "chat" && (

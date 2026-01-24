@@ -68,11 +68,24 @@ async def chat_message(request: ChatRequest):
         async for rc in rc_cursor:
             related_concepts[str(rc["_id"])] = rc["label"]
 
-    # 3. Construct Structured Context
+    # 3. Get ALL available concepts in the document for abbreviation matching
+    all_concepts = []
+    all_concepts_cursor = db.concepts.find({"document_id": request.document_id})
+    async for concept_doc in all_concepts_cursor:
+        all_concepts.append(concept_doc.get("label", "Unknown"))
+    
+    # Create abbreviation mapping
+    concept_abbreviations = "\n".join([f"- {c}" for c in sorted(all_concepts)])
+
+    # 4. Construct Structured Context
     structured_context = []
     
+    # Section: Available Concepts
+    structured_context.append("### Available Concepts in this Document:")
+    structured_context.append(concept_abbreviations)
+    
     # Section: Concept Profile
-    structured_context.append(f"### Concept Profile: {concept_label}")
+    structured_context.append(f"\n### Concept Profile: {concept_label}")
     if concept.get("description"):
         structured_context.append(f"Description: {concept['description']}")
     if concept.get("unit"):

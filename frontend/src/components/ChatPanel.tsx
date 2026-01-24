@@ -35,7 +35,114 @@ export function ChatPanel({
   }, [conceptId]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.parentElement?.scrollTo({
+        top: messagesEndRef.current.parentElement.scrollHeight,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  // Format assistant response with markdown support
+  const formatAssistantResponse = (content: string) => {
+    const lines = content.split("\n");
+    const parts: React.ReactNode[] = [];
+    let bulletPoints: string[] = [];
+    let inCodeBlock = false;
+    let codeContent = "";
+    let codeLanguage = "";
+
+    const flushBulletPoints = () => {
+      if (bulletPoints.length > 0) {
+        parts.push(
+          <ul
+            key={`bullets-${parts.length}`}
+            className="list-disc list-inside mb-2 text-white/90 space-y-1"
+          >
+            {bulletPoints.map((point, idx) => (
+              <li key={idx} className="text-white/90">
+                {point}
+              </li>
+            ))}
+          </ul>,
+        );
+        bulletPoints = [];
+      }
+    };
+
+    const parseInlineMarkdown = (text: string) => {
+      const parts: React.ReactNode[] = [];
+      let lastIndex = 0;
+      const boldRegex = /\*\*([^*]+)\*\*/g;
+      let match;
+
+      while ((match = boldRegex.exec(text)) !== null) {
+        // Add text before bold
+        if (match.index > lastIndex) {
+          parts.push(text.substring(lastIndex, match.index));
+        }
+        // Add bold text
+        parts.push(<strong key={`bold-${parts.length}`}>{match[1]}</strong>);
+        lastIndex = match.index + match[0].length;
+      }
+
+      // Add remaining text
+      if (lastIndex < text.length) {
+        parts.push(text.substring(lastIndex));
+      }
+
+      return parts.length > 0 ? parts : text;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Handle code blocks
+      if (line.trim().startsWith("```")) {
+        if (!inCodeBlock) {
+          flushBulletPoints();
+          inCodeBlock = true;
+          codeLanguage = line.replace("```", "").trim();
+          codeContent = "";
+        } else {
+          inCodeBlock = false;
+          parts.push(
+            <pre
+              key={`code-${parts.length}`}
+              className="bg-black/40 border border-white/10 rounded p-3 mb-3 overflow-x-auto text-xs text-white/80"
+            >
+              <code>{codeContent}</code>
+            </pre>,
+          );
+        }
+        continue;
+      }
+
+      if (inCodeBlock) {
+        codeContent += line + "\n";
+        continue;
+      }
+
+      // Handle bullet points
+      if (line.trim().startsWith("-") || line.trim().startsWith("*")) {
+        const bulletText = line.trim().substring(1).trim();
+        bulletPoints.push(bulletText);
+        continue;
+      }
+
+      // Handle regular text with markdown formatting
+      if (line.trim()) {
+        flushBulletPoints();
+        parts.push(
+          <div key={i} className="text-white/90 mb-2 leading-relaxed">
+            {parseInlineMarkdown(line)}
+          </div>,
+        );
+      }
+    }
+
+    flushBulletPoints();
+    return parts.length > 0 ? parts : content;
   };
 
   useEffect(() => {
@@ -113,11 +220,13 @@ export function ChatPanel({
             key={index}
             className={`flex items-start gap-3 ${
               msg.role === "user" ? "flex-row-reverse" : ""
-            }`}>
+            }`}
+          >
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                 msg.role === "user" ? "bg-blue-600" : "bg-emerald-600"
-              }`}>
+              }`}
+            >
               {msg.role === "user" ? (
                 <UserIcon className="w-4 h-4 text-white" />
               ) : (
@@ -130,8 +239,11 @@ export function ChatPanel({
                 msg.role === "user"
                   ? "bg-blue-600 text-white rounded-tr-none"
                   : "bg-white/10 text-white/90 rounded-tl-none border border-white/5"
-              }`}>
-              {msg.content}
+              }`}
+            >
+              {msg.role === "assistant"
+                ? formatAssistantResponse(msg.content)
+                : msg.content}
             </div>
           </div>
         ))}
@@ -158,12 +270,13 @@ export function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type your question..."
-            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all"
+            className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-white/50 focus:ring-1 focus:ring-white/50 transition-all"
           />
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="p-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            className="p-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
             <Send className="w-4 h-4" />
           </button>
         </form>
