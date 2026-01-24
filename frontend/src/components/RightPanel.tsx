@@ -14,6 +14,8 @@ interface RightPanelProps {
   documentId: string | null;
   selectedNode: ConceptNode | null;
   selectedEdge: RelationshipEdge | null;
+  sourceNode?: ConceptNode | null;
+  targetNode?: ConceptNode | null;
   neighbors?: Array<{ node: ConceptNode; relationship: RelationshipEdge }>;
   isCollapsed?: boolean;
   onToggle?: () => void;
@@ -24,6 +26,8 @@ export function RightPanel({
   documentId,
   selectedNode,
   selectedEdge,
+  sourceNode,
+  targetNode,
   neighbors = [],
   isCollapsed = false,
   onToggle,
@@ -52,11 +56,10 @@ export function RightPanel({
               onToggle?.();
               setActiveTab("explore");
             }}
-            className={`w-full p-2 flex items-center justify-center rounded-lg transition-colors ${
-              activeTab === "explore"
-                ? "text-blue-400 bg-white/10"
-                : "text-white/50 hover:text-white hover:bg-white/10"
-            }`}
+            className={`w-full p-2 flex items-center justify-center rounded-lg transition-colors ${activeTab === "explore"
+              ? "text-blue-400 bg-white/10"
+              : "text-white/50 hover:text-white hover:bg-white/10"
+              }`}
             title="Explore">
             <Compass className="w-5 h-5" />
           </button>
@@ -65,11 +68,10 @@ export function RightPanel({
               onToggle?.();
               setActiveTab("chat");
             }}
-            className={`w-full p-2 flex items-center justify-center rounded-lg transition-colors ${
-              activeTab === "chat"
-                ? "text-emerald-400 bg-white/10"
-                : "text-white/50 hover:text-white hover:bg-white/10"
-            }`}
+            className={`w-full p-2 flex items-center justify-center rounded-lg transition-colors ${activeTab === "chat"
+              ? "text-emerald-400 bg-white/10"
+              : "text-white/50 hover:text-white hover:bg-white/10"
+              }`}
             title="Chat">
             <MessageSquare className="w-5 h-5" />
           </button>
@@ -91,11 +93,10 @@ export function RightPanel({
         </button>
         <button
           onClick={() => setActiveTab("explore")}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
-            activeTab === "explore"
-              ? "text-blue-400"
-              : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}>
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${activeTab === "explore"
+            ? "text-blue-400"
+            : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}>
           <Compass className="w-4 h-4" />
           Explore
           {activeTab === "explore" && (
@@ -104,11 +105,10 @@ export function RightPanel({
         </button>
         <button
           onClick={() => setActiveTab("chat")}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${
-            activeTab === "chat"
-              ? "text-emerald-400"
-              : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}>
+          className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative ${activeTab === "chat"
+            ? "text-emerald-400"
+            : "text-white/60 hover:text-white hover:bg-white/5"
+            }`}>
           <MessageSquare className="w-4 h-4" />
           Chat
           {activeTab === "chat" && (
@@ -125,6 +125,8 @@ export function RightPanel({
               documentId={documentId}
               selectedNode={selectedNode}
               selectedEdge={selectedEdge}
+              sourceNode={sourceNode}
+              targetNode={targetNode}
               neighbors={neighbors}
               onClose={onClose}
             />
