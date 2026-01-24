@@ -218,23 +218,26 @@ function NodeCard({
             className={`
                         flex flex-col items-center justify-center
                         backdrop-blur-xl border shadow-2xl transition-all duration-300
-                        ${isCenter
-                ? "w-48 h-48 rounded-full border-purple-500/50 bg-[#13131f]/90"
-                : "w-32 h-32 rounded-3xl"
-              }
-                        ${!isCenter &&
-              (isSelected
-                ? "border-white/60 bg-[#1e1e2e]/95"
-                : "border-white/10 bg-[#0a0a0f]/80 hover:border-white/30 hover:bg-[#13131f]/90")
-              }
+                        ${
+                          isCenter
+                            ? "w-48 h-48 rounded-full border-purple-500/50 bg-[#13131f]/90"
+                            : "w-32 h-32 rounded-3xl"
+                        }
+                        ${
+                          !isCenter &&
+                          (isSelected
+                            ? "border-white/60 bg-[#1e1e2e]/95"
+                            : "border-white/10 bg-[#0a0a0f]/80 hover:border-white/30 hover:bg-[#13131f]/90")
+                        }
                     `}>
             <div
               className={`
                             flex items-center justify-center mb-3 text-white shadow-lg
-                            ${isCenter
-                  ? `w-20 h-20 rounded-full bg-gradient-to-br ${gradient}`
-                  : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient}`
-                }
+                            ${
+                              isCenter
+                                ? `w-20 h-20 rounded-full bg-gradient-to-br ${gradient}`
+                                : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient}`
+                            }
                         `}>
               <Icon className={`${isCenter ? "w-10 h-10" : "w-7 h-7"}`} />
             </div>
@@ -293,7 +296,6 @@ function Scene({
     setAnimatedNodes(nodes);
   }, [nodes]);
 
-<<<<<<< HEAD
   useFrame((_state, delta) => {
     if (!selectedNodeId && !selectedEdgeId) {
       if (groupRef.current) {
@@ -312,7 +314,7 @@ function Scene({
       });
     }
     if (selectedEdgeId) {
-      const edge = edges.find(e => e.id === selectedEdgeId);
+      const edge = edges.find((e) => e.id === selectedEdgeId);
       if (edge) {
         set.add(edge.source);
         set.add(edge.target);
@@ -374,7 +376,7 @@ export function ConceptGraph3D({
   graphData,
   onNodeSelect,
   // onNodeExpand,
-  // onEdgeSelect,
+  onEdgeSelect,
   selectedNodeId,
   selectedEdgeId,
   onBackgroundClick,

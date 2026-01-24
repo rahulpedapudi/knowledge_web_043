@@ -201,8 +201,7 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
         <div className="flex items-center justify-between px-4 py-3">
           <button
             onClick={handleBackToUpload}
-            className="flex items-center gap-2 text-sm text-white/70 hover:text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-colors"
-          >
+            className="flex items-center gap-2 text-sm text-white/70 hover:text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-colors">
             <X className="w-4 h-4" />
             <span>Cancel</span>
           </button>
@@ -246,15 +245,13 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
           <div className="w-full flex gap-3">
             <button
               onClick={handleBackToUpload}
-              className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-white/70 hover:bg-white/5 transition-colors"
-            >
+              className="flex-1 py-3 px-4 rounded-xl border border-white/10 text-white/70 hover:bg-white/5 transition-colors">
               Back
             </button>
             <button
               onClick={handleTopicOnlyProcess}
               disabled={isLoading || !focusConcepts.trim()}
-              className="flex-1 py-3 px-4 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500"
-            >
+              className="flex-1 py-3 px-4 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500">
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -300,11 +297,9 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
         {/* Upload Card - Combined from both versions */}
         <div className="w-full max-w-2xl mb-8 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
           <div
-            className={`relative group rounded-3xl p-[1px] bg-gradient-to-br from-white/10 to-transparent transition-all duration-300 ${dragOver ? "scale-[1.02] from-purple-500/50 to-blue-500/50" : ""}`}
-          >
+            className={`relative group rounded-3xl p-[1px] bg-gradient-to-br from-white/10 to-transparent transition-all duration-300 ${dragOver ? "scale-[1.02] from-purple-500/50 to-blue-500/50" : ""}`}>
             <div
-              className={`relative bg-[#0a0a0f]/40 backdrop-blur-xl rounded-3xl p-8 border border-white/5 overflow-hidden transition-all duration-300 group-hover:bg-[#13131f]/40 ${dragOver ? "bg-[#13131f]/60" : ""}`}
-            >
+              className={`relative bg-[#0a0a0f]/40 backdrop-blur-xl rounded-3xl p-8 border border-white/5 overflow-hidden transition-all duration-300 group-hover:bg-[#13131f]/40 ${dragOver ? "bg-[#13131f]/60" : ""}`}>
               <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-transparent to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
 
               <div className="flex gap-4 relative z-10">
@@ -320,8 +315,7 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
                     dragOver
                       ? "border-white/40 bg-white/5"
                       : "border-white/10 hover:border-white/20 hover:bg-white/5"
-                  }`}
-                >
+                  }`}>
                   <label className="flex flex-col items-center justify-center w-full cursor-pointer gap-3">
                     <div className="w-14 h-14 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-2">
                       <Upload className="w-6 h-6 text-white/60" />
@@ -345,10 +339,9 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
                 </div>
 
                 {/* Learn Any Topic */}
-                <button
+                {/* <button
                   onClick={handleTopicOnlyMode}
-                  className="flex-1 border-2 border-dashed border-blue-500/30 rounded-xl p-6 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5"
-                >
+                  className="flex-1 border-2 border-dashed border-blue-500/30 rounded-xl p-6 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5">
                   <div className="w-14 h-14 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-2">
                     <BookOpen className="w-6 h-6 text-blue-400" />
                   </div>
@@ -358,7 +351,7 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
                   <span className="text-xs text-white/40">
                     No document needed
                   </span>
-                </button>
+                </button> */}
               </div>
             </div>
           </div>
@@ -371,8 +364,7 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
               relative flex items-center gap-2 p-2 rounded-[32px] 
               bg-white/5 backdrop-blur-2xl border transition-all duration-300
               ${inputText ? "border-purple-500/30 bg-white/10 shadow-[0_0_40px_rgba(168,85,247,0.15)]" : "border-white/10 hover:border-white/20"}
-           `}
-          >
+           `}>
             <button className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all shrink-0">
               <Plus className="w-5 h-5" />
             </button>
@@ -392,8 +384,7 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
                 <button
                   onClick={handleInputSubmit}
                   disabled={isLoading}
-                  className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-200 transition-all shadow-lg active:scale-90"
-                >
+                  className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-200 transition-all shadow-lg active:scale-90">
                   {isLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
