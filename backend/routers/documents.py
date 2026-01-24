@@ -221,10 +221,18 @@ async def upload_pdf(
         {"$set": {"processed": True}}
     )
 
-    # Generate title for chat
-    chat_title = generate_chat_title(raw_text)
-    if not chat_title or not chat_title.strip():
-        chat_title = doc_data["title"] or "New Chat"
+    # Generate title for chat - with fallback
+    try:
+        chat_title = generate_chat_title(raw_text)
+        if not chat_title or not chat_title.strip():
+            chat_title = doc_data["title"]
+    except Exception as e:
+        print(f"Chat title generation failed: {str(e)}")
+        chat_title = doc_data["title"]
+    
+    # Final fallback
+    if not chat_title or len(chat_title.strip()) == 0:
+        chat_title = "New Chat"
 
     # Create chat session linked to this document
     chat_data = {
@@ -277,7 +285,7 @@ async def paste_text(
 
     # Create document
     doc_data = {
-        "title": title,
+        "title": title or "Pasted Text",
         "source_type": "text",
         "raw_text": text,
         "focus_concepts": concepts_list,
@@ -340,10 +348,18 @@ async def paste_text(
         {"$set": {"processed": True}}
     )
 
-    # Generate title for chat
-    chat_title = generate_chat_title(text)
-    if not chat_title or not chat_title.strip():
-        chat_title = doc_data["title"] or "New Chat"
+    # Generate title for chat - with fallback
+    try:
+        chat_title = generate_chat_title(text)
+        if not chat_title or not chat_title.strip():
+            chat_title = "Learn: " + text[:50].replace('\n', ' ')
+    except Exception as e:
+        print(f"Chat title generation failed: {str(e)}")
+        chat_title = "Learn: " + text[:50].replace('\n', ' ')
+    
+    # Clean up title
+    if not chat_title or len(chat_title.strip()) == 0:
+        chat_title = "New Chat"
 
     # Create chat session linked to this document
     chat_data = {
@@ -357,7 +373,7 @@ async def paste_text(
     return {
         "document_id": doc_id,
         "chat_id": str(chat_result.inserted_id),
-        "title": doc_data["title"],
+        "title": chat_title,
         "total_sentences": analysis["total_sentences"],
         "causal_sentences": analysis["causal_count"],
         "concepts_extracted": len(analysis["concepts"]),

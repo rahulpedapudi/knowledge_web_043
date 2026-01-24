@@ -405,6 +405,7 @@ Return your response as a valid JSON object following the schema in the system p
 def chat_with_context(context: str, message: str, history: List[Dict[str, str]] = None) -> str:
     """
     Chat with the LLM using provided context.
+    Improved to handle abbreviations, spelling mistakes, and context understanding.
     """
     global client
     if not client and settings.groq_api_key:
@@ -413,17 +414,24 @@ def chat_with_context(context: str, message: str, history: List[Dict[str, str]] 
     if not client:
         return "Error: AI service not available. Please check API key configuration."
 
-    # Prepare messages
+    # Prepare messages with enhanced system prompt
     messages = [
         {
             "role": "system",
             "content": f"""You are a helpful assistant analyzing a document. 
-            Use the following context to answer the user's question. 
-            If the answer is not in the context, say so politely.
-            Keep answers concise and relevant to the specific concept being discussed.
-            
-            Context:
-            {context}"""
+
+IMPORTANT INSTRUCTIONS:
+1. The user may use abbreviations, shorthand, or misspellings. Try to understand what they mean by looking at the context and available concepts.
+2. If a concept is mentioned in abbreviated form (e.g., "cn" for "Computer Network"), identify and explain the full concept.
+3. If you find a possible match despite spelling variations, use that context.
+4. Be flexible with interpretations - the user might be asking about related concepts.
+5. If you truly cannot find information, politely explain what you looked for and ask for clarification.
+6. Always check the "Available Concepts" section to understand what topics exist in the document.
+7. Format your response with clear headings (using **heading**) followed by detailed explanations.
+
+Use the following context to answer the user's question:
+
+{context}"""
         }
     ]
 
@@ -432,8 +440,12 @@ def chat_with_context(context: str, message: str, history: List[Dict[str, str]] 
         for msg in history:
             messages.append({"role": msg["role"], "content": msg["content"]})
 
-    # Add current message
-    messages.append({"role": "user", "content": message})
+    # Add current message with clarification prompt
+    enhanced_message = f"""{message}
+
+(Note: If this message contains abbreviations or seems unclear, please interpret it in the context of the available concepts and respond accordingly.)"""
+    
+    messages.append({"role": "user", "content": enhanced_message})
 
     model_name = "openai/gpt-oss-120b"
 
