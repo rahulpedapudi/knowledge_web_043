@@ -64,7 +64,12 @@ class ConceptBase(BaseModel):
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     default_value: Optional[float] = None
-
+    abstraction_level: Optional[int] = None
+    depth_level: Optional[int] = None
+    category: Optional[str] = None
+    semantic_type: Optional[str] = None
+    priority: Optional[int] = None  # 1 (Main), 2 (Secondary), 3 (Detail)
+    parent_concepts: Optional[list[str]] = None
 
 class ConceptCreate(ConceptBase):
     pass
@@ -110,6 +115,12 @@ class ConceptNode(BaseModel):
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     default_value: Optional[float] = None
+    abstraction_level: Optional[int] = None
+    depth_level: Optional[int] = None
+    priority: Optional[int] = None
+    category: Optional[str] = None
+    semantic_type: Optional[str] = None
+    parent_concepts: Optional[list[str]] = None
 
 
 class RelationshipEdge(BaseModel):

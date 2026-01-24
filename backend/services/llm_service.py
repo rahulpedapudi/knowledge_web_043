@@ -24,8 +24,8 @@ You must output ONLY valid JSON matching the specified schema.
 Extraction Rules:
 1. EXHAUSTIVELY extract concepts. Do not limit to just the main ones. Look for details, sub-components, and related attributes. Aim for 20-40 concepts if the text allows.
 2. Structure concepts hierarchically using `depth_level` (0-3):
-   - Level 0 (Core): The main 3-5 central topics of the text.
-   - Level 1 (Primary): Major sub-topics or direct attributes of core concepts.
+   - Level 0 (Core - Priority 1): The main 3-5 central topics of the text. These are the most important nodes.
+   - Level 1 (Primary - Priority 2): Major sub-topics or direct attributes of core concepts.
    - Level 2 (Secondary): Specific details, examples, or minor components.
    - Level 3 (Detail): Very specific values, minor nuances, or granular data points (these will only appear when zooming in).
 3. Connect concepts CAPILLARY-STYLE:
@@ -35,6 +35,7 @@ Extraction Rules:
 4. For each concept, determine:
    - abstraction_level: 0-10 scale (0=very concrete/specific, 10=very abstract/general/foundational)
    - depth_level: 0-3 scale as defined above.
+   - priority: 1 (Main/Core), 2 (Secondary/Primary), 3 (Detail).
    - category: semantic grouping (e.g., "economics", "physics", "biology", "psychology")
    - semantic_type: one of "variable", "law", "process", "entity"
    - parent_concepts: list of IDs of the IMMEDIATE parent level concept (e.g. Level 2 node should have Level 1 parent).
@@ -52,6 +53,7 @@ Output Schema:
             "default_value": 50,
             "abstraction_level": 5,
             "depth_level": 1,
+            "priority": 2,
             "category": "physics",
             "semantic_type": "variable",
             "parent_concepts": ["core_concept_id"]
@@ -81,8 +83,8 @@ The user wants to learn about specific concepts. You must:
 4. Include prerequisites, consequences, and related details of the focus concepts
 
 Extraction Rules:
-1. The FOCUS CONCEPTS provided by the user should be at depth_level 0 (Core)
-2. Direct relationships and immediate details of focus concepts should be at depth_level 1 (Primary)
+1. The FOCUS CONCEPTS provided by the user should be at depth_level 0 (Core - Priority 1)
+2. Direct relationships and immediate details of focus concepts should be at depth_level 1 (Primary - Priority 2)
 3. Supporting information and examples should be at depth_level 2-3
 4. Extract 15-30 concepts total, ensuring comprehensive coverage of the focus areas
 5. Every concept extracted should have a clear path connecting to at least one focus concept
@@ -100,6 +102,7 @@ Output Schema:
             "default_value": 50,
             "abstraction_level": 5,
             "depth_level": 0,
+            "priority": 1,
             "category": "biology",
             "semantic_type": "variable",
             "parent_concepts": []
@@ -127,8 +130,8 @@ You must CREATE educational content from your knowledge - you are NOT analyzing 
 Generation Rules:
 1. The user's TOPICS should become depth_level 0 (Core) concepts
 2. Generate 20-35 concepts total covering:
-   - The main topics (depth_level 0)
-   - Key sub-topics and components (depth_level 1)  
+   - The main topics (depth_level 0 - Priority 1)
+   - Key sub-topics and components (depth_level 1 - Priority 2)  
    - Important details, examples, and applications (depth_level 2)
    - Specific facts, formulas, or granular details (depth_level 3)
 3. Create meaningful relationships showing how concepts connect:
@@ -152,6 +155,7 @@ Output Schema:
             "default_value": null,
             "abstraction_level": 5,
             "depth_level": 0,
+            "priority": 1,
             "category": "topic_category",
             "semantic_type": "variable" | "law" | "process" | "entity",
             "parent_concepts": []

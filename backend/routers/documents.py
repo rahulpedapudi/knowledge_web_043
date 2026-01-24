@@ -515,7 +515,13 @@ async def get_document_graph(document_id: str, user_id: str = Depends(get_curren
             unit=concept.get("unit"),
             min_value=concept.get("min_value"),
             max_value=concept.get("max_value"),
-            default_value=concept.get("default_value")
+            default_value=concept.get("default_value"),
+            abstraction_level=concept.get("abstraction_level"),
+            depth_level=concept.get("depth_level"),
+            priority=concept.get("priority"),
+            category=concept.get("category"),
+            semantic_type=concept.get("semantic_type"),
+            parent_concepts=concept.get("parent_concepts")
         ))
 
     # Get relationships
