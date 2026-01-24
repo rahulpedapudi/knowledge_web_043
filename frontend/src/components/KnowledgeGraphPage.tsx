@@ -172,24 +172,41 @@ export function KnowledgeGraphPage({
     [handleNodeSelect, graphData],
   );
 
+  const [selectedSourceNode, setSelectedSourceNode] = useState<ConceptNode | null>(null);
+  const [selectedTargetNode, setSelectedTargetNode] = useState<ConceptNode | null>(null);
+
   // Click on edge - select for simulation
   const handleEdgeSelect = useCallback((edge: D3Link) => {
+    // Resolve IDs
+    const sourceId = typeof edge.source === "string" ? edge.source : edge.source.id;
+    const targetId = typeof edge.target === "string" ? edge.target : edge.target.id;
+
     setSelectedEdge({
       id: edge.id,
-      source: typeof edge.source === "string" ? edge.source : edge.source.id,
-      target: typeof edge.target === "string" ? edge.target : edge.target.id,
+      source: sourceId,
+      target: targetId,
       relationship_type: edge.relationship_type,
       description: edge.description,
       equation: edge.equation,
       has_simulation: edge.has_simulation,
     });
     setSelectedNode(null);
-  }, []);
+
+    // Find full node objects for context
+    if (graphData) {
+      const sNode = graphData.concepts.find(c => c.id === sourceId) || null;
+      const tNode = graphData.concepts.find(c => c.id === targetId) || null;
+      setSelectedSourceNode(sNode);
+      setSelectedTargetNode(tNode);
+    }
+  }, [graphData]);
 
   // Click on background - deselect all
   const handleBackgroundClick = useCallback(() => {
     setSelectedNode(null);
     setSelectedEdge(null);
+    setSelectedSourceNode(null);
+    setSelectedTargetNode(null);
   }, []);
 
   const visibleGraphData = getVisibleGraphData();
@@ -259,12 +276,16 @@ export function KnowledgeGraphPage({
         documentId={documentId}
         selectedNode={selectedNode}
         selectedEdge={selectedEdge}
+        sourceNode={selectedSourceNode}
+        targetNode={selectedTargetNode}
         neighbors={selectedNodeNeighbors}
         isCollapsed={rightPanelCollapsed}
         onToggle={() => setRightPanelCollapsed(!rightPanelCollapsed)}
         onClose={() => {
           setSelectedNode(null);
           setSelectedEdge(null);
+          setSelectedSourceNode(null);
+          setSelectedTargetNode(null);
         }}
       />
     </div>

@@ -97,6 +97,7 @@ function ConnectionLine({
   isActive,
   onHover,
   onUnhover,
+  onClick,
 }: {
   start: [number, number, number];
   end: [number, number, number];
@@ -104,6 +105,7 @@ function ConnectionLine({
   isActive: boolean;
   onHover: () => void;
   onUnhover: () => void;
+  onClick: () => void;
 }) {
   const mid = [
     (start[0] + end[0]) / 2,
@@ -129,6 +131,10 @@ function ConnectionLine({
           e.stopPropagation();
           onUnhover();
         }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
       />
       <QuadraticBezierLine
         start={start}
@@ -145,6 +151,10 @@ function ConnectionLine({
         onPointerOut={(e) => {
           e.stopPropagation();
           onUnhover();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
         }}
       />
     </group>
@@ -208,26 +218,23 @@ function NodeCard({
             className={`
                         flex flex-col items-center justify-center
                         backdrop-blur-xl border shadow-2xl transition-all duration-300
-                        ${
-                          isCenter
-                            ? "w-48 h-48 rounded-full border-purple-500/50 bg-[#13131f]/90"
-                            : "w-32 h-32 rounded-3xl"
-                        }
-                        ${
-                          !isCenter &&
-                          (isSelected
-                            ? "border-white/60 bg-[#1e1e2e]/95"
-                            : "border-white/10 bg-[#0a0a0f]/80 hover:border-white/30 hover:bg-[#13131f]/90")
-                        }
+                        ${isCenter
+                ? "w-48 h-48 rounded-full border-purple-500/50 bg-[#13131f]/90"
+                : "w-32 h-32 rounded-3xl"
+              }
+                        ${!isCenter &&
+              (isSelected
+                ? "border-white/60 bg-[#1e1e2e]/95"
+                : "border-white/10 bg-[#0a0a0f]/80 hover:border-white/30 hover:bg-[#13131f]/90")
+              }
                     `}>
             <div
               className={`
                             flex items-center justify-center mb-3 text-white shadow-lg
-                            ${
-                              isCenter
-                                ? `w-20 h-20 rounded-full bg-gradient-to-br ${gradient}`
-                                : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient}`
-                            }
+                            ${isCenter
+                  ? `w-20 h-20 rounded-full bg-gradient-to-br ${gradient}`
+                  : `w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient}`
+                }
                         `}>
               <Icon className={`${isCenter ? "w-10 h-10" : "w-7 h-7"}`} />
             </div>
@@ -267,14 +274,16 @@ function Scene({
   nodes,
   edges,
   selectedNodeId,
-  // selectedEdgeId,
+  selectedEdgeId,
   onNodeClick,
+  onEdgeClick,
 }: {
   nodes: Node3D[];
   edges: any[];
   selectedNodeId: string | null | undefined;
   selectedEdgeId: string | null | undefined;
   onNodeClick: (n: Node3D) => void;
+  onEdgeClick: (e: D3Link) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
@@ -284,8 +293,9 @@ function Scene({
     setAnimatedNodes(nodes);
   }, [nodes]);
 
+<<<<<<< HEAD
   useFrame((_state, delta) => {
-    if (!selectedNodeId) {
+    if (!selectedNodeId && !selectedEdgeId) {
       if (groupRef.current) {
         groupRef.current.rotation.y += delta * 0.15;
       }
@@ -301,8 +311,15 @@ function Scene({
         if (e.target === selectedNodeId) set.add(e.source);
       });
     }
+    if (selectedEdgeId) {
+      const edge = edges.find(e => e.id === selectedEdgeId);
+      if (edge) {
+        set.add(edge.source);
+        set.add(edge.target);
+      }
+    }
     return set;
-  }, [selectedNodeId, edges]);
+  }, [selectedNodeId, selectedEdgeId, edges]);
 
   return (
     <group ref={groupRef}>
@@ -318,7 +335,12 @@ function Scene({
         let color = "#4b5563";
         if (target.variant === "vibrant" || source.variant === "vibrant")
           color = "#a855f7";
-        if (isHovered || isConnectedToSelection) color = "#ffffff";
+
+        const isSelected = selectedEdgeId === edge.id;
+        // If hovered or selected, white. If connected to selection, also white but maybe different?
+        // User wants "highlighted properly".
+        if (isHovered || isSelected) color = "#ffffff";
+        else if (isConnectedToSelection) color = "#e2e8f0"; // Slightly dimmer than active hover
 
         return (
           <ConnectionLine
@@ -326,9 +348,10 @@ function Scene({
             start={source.position}
             end={target.position}
             color={color}
-            isActive={isConnectedToSelection || isHovered}
+            isActive={isConnectedToSelection || isHovered || isSelected}
             onHover={() => setHoveredEdgeId(edge.id)}
             onUnhover={() => setHoveredEdgeId(null)}
+            onClick={() => onEdgeClick(edge)}
           />
         );
       })}
@@ -466,6 +489,7 @@ export function ConceptGraph3D({
           selectedNodeId={selectedNodeId}
           selectedEdgeId={selectedEdgeId}
           onNodeClick={onNodeSelect}
+          onEdgeClick={onEdgeSelect}
         />
 
         <OrbitControls

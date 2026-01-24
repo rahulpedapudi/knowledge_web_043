@@ -17,6 +17,8 @@ interface ExplorePanelProps {
   documentId: string | null;
   selectedNode: ConceptNode | null;
   selectedEdge: RelationshipEdge | null;
+  sourceNode?: ConceptNode | null;
+  targetNode?: ConceptNode | null;
   neighbors?: Array<{ node: ConceptNode; relationship: RelationshipEdge }>;
   onClose: () => void;
 }
@@ -27,6 +29,8 @@ export function ExplorePanel({
   documentId,
   selectedNode,
   selectedEdge,
+  sourceNode,
+  targetNode,
   neighbors = [],
   onClose,
 }: ExplorePanelProps) {
@@ -51,6 +55,8 @@ export function ExplorePanel({
           <SimulationPanel
             selectedNode={selectedNode}
             selectedEdge={selectedEdge}
+            sourceNode={sourceNode}
+            targetNode={targetNode}
             onClose={onClose}
           />
         </div>
@@ -177,11 +183,10 @@ export function ExplorePanel({
         {/* Quiz Card */}
         <div
           onClick={() => selectedNode && documentId && setView("quiz")}
-          className={`p-4 rounded-xl border transition-all cursor-pointer ${
-            selectedNode && documentId
-              ? "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 hover:border-purple-500/30"
-              : "bg-slate-800/30 border-slate-700/30 opacity-50 cursor-not-allowed"
-          }`}>
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${selectedNode && documentId
+            ? "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 hover:border-purple-500/30"
+            : "bg-slate-800/30 border-slate-700/30 opacity-50 cursor-not-allowed"
+            }`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
               <BrainCircuit className="w-5 h-5 text-purple-400" />
@@ -196,11 +201,10 @@ export function ExplorePanel({
         {/* Flashcards Card */}
         <div
           onClick={() => selectedNode && documentId && setView("flashcards")}
-          className={`p-4 rounded-xl border transition-all cursor-pointer ${
-            selectedNode && documentId
-              ? "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 hover:border-emerald-500/30"
-              : "bg-slate-800/30 border-slate-700/30 opacity-50 cursor-not-allowed"
-          }`}>
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${selectedNode && documentId
+            ? "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 hover:border-emerald-500/30"
+            : "bg-slate-800/30 border-slate-700/30 opacity-50 cursor-not-allowed"
+            }`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-emerald-400" />
@@ -215,11 +219,10 @@ export function ExplorePanel({
         {/* Simulation Card */}
         <div
           onClick={() => selectedEdge && setView("simulation")}
-          className={`p-4 rounded-xl border transition-all cursor-pointer ${
-            selectedEdge?.has_simulation
-              ? "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 hover:border-blue-500/30"
-              : "bg-slate-800/30 border-slate-700/30 opacity-50 cursor-not-allowed"
-          }`}>
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${selectedEdge?.has_simulation
+            ? "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 hover:border-blue-500/30"
+            : "bg-slate-800/30 border-slate-700/30 opacity-50 cursor-not-allowed"
+            }`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
               <Zap className="w-5 h-5 text-blue-400" />

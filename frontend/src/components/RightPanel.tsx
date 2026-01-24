@@ -13,6 +13,8 @@ interface RightPanelProps {
   documentId: string | null;
   selectedNode: ConceptNode | null;
   selectedEdge: RelationshipEdge | null;
+  sourceNode?: ConceptNode | null;
+  targetNode?: ConceptNode | null;
   neighbors?: Array<{ node: ConceptNode; relationship: RelationshipEdge }>;
   isCollapsed?: boolean;
   onToggle?: () => void;
@@ -23,6 +25,8 @@ export function RightPanel({
   documentId,
   selectedNode,
   selectedEdge,
+  sourceNode,
+  targetNode,
   neighbors = [],
   isCollapsed = false,
   onToggle,
@@ -40,8 +44,7 @@ export function RightPanel({
           <button
             onClick={onToggle}
             className="w-full p-2 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            title="Expand panel"
-          >
+            title="Expand panel">
             <ChevronLeft className="w-5 h-5" />
           </button>
         </div>
@@ -57,8 +60,7 @@ export function RightPanel({
                 ? "text-blue-400 bg-white/10"
                 : "text-white/50 hover:text-white hover:bg-white/10"
             }`}
-            title="Explore"
-          >
+            title="Explore">
             <Compass className="w-5 h-5" />
           </button>
           <button
@@ -71,8 +73,7 @@ export function RightPanel({
                 ? "text-emerald-400 bg-white/10"
                 : "text-white/50 hover:text-white hover:bg-white/10"
             }`}
-            title="Chat"
-          >
+            title="Chat">
             <MessageSquare className="w-5 h-5" />
           </button>
         </div>
@@ -91,8 +92,7 @@ export function RightPanel({
             activeTab === "explore"
               ? "text-blue-400"
               : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}
-        >
+          }`}>
           <Compass className="w-4 h-4" />
           Explore
           {activeTab === "explore" && (
@@ -105,8 +105,7 @@ export function RightPanel({
             activeTab === "chat"
               ? "text-emerald-400"
               : "text-white/60 hover:text-white hover:bg-white/5"
-          }`}
-        >
+          }`}>
           <MessageSquare className="w-4 h-4" />
           Chat
           {activeTab === "chat" && (
@@ -123,6 +122,8 @@ export function RightPanel({
               documentId={documentId}
               selectedNode={selectedNode}
               selectedEdge={selectedEdge}
+              sourceNode={sourceNode}
+              targetNode={targetNode}
               neighbors={neighbors}
               onClose={onClose}
             />
