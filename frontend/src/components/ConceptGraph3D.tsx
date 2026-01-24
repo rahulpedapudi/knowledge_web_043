@@ -267,7 +267,7 @@ function Scene({
   nodes,
   edges,
   selectedNodeId,
-  selectedEdgeId,
+  // selectedEdgeId,
   onNodeClick,
 }: {
   nodes: Node3D[];
@@ -278,13 +278,13 @@ function Scene({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
-  const [animatedNodes, setAnimatedNodes] = useState<Node3D[]>(nodes);
+  const [, setAnimatedNodes] = useState<Node3D[]>(nodes);
 
   useEffect(() => {
     setAnimatedNodes(nodes);
   }, [nodes]);
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     if (!selectedNodeId) {
       if (groupRef.current) {
         groupRef.current.rotation.y += delta * 0.15;
@@ -306,7 +306,7 @@ function Scene({
 
   return (
     <group ref={groupRef}>
-      {edges.map((edge, i) => {
+      {edges.map((edge, _i) => {
         const source = nodes.find((n) => n.id === edge.source);
         const target = nodes.find((n) => n.id === edge.target);
         if (!source || !target) return null;
@@ -350,8 +350,8 @@ function Scene({
 export function ConceptGraph3D({
   graphData,
   onNodeSelect,
-  onNodeExpand,
-  onEdgeSelect,
+  // onNodeExpand,
+  // onEdgeSelect,
   selectedNodeId,
   selectedEdgeId,
   onBackgroundClick,
@@ -450,7 +450,7 @@ export function ConceptGraph3D({
     <div className="w-full h-full relative bg-transparent">
       <Canvas
         camera={{ position: [0, 30, 45], fov: 45 }}
-        onPointerMissed={(e) => {
+        onPointerMissed={(_e) => {
           // Deselect on background click
           if (onBackgroundClick) onBackgroundClick();
         }}>

@@ -5,7 +5,7 @@ import {
   BrainCircuit,
   ArrowLeft,
   Share2,
-  Activity,
+  // Activity,
   Info,
 } from "lucide-react";
 import { SimulationPanel } from "./SimulationPanel";

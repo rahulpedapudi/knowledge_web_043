@@ -1,9 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Upload,
   Loader2,
-  Mic,
-  Headphones,
+  // Mic,
+  // Headphones,
   Plus,
   ArrowUp,
   FileText,
@@ -11,6 +11,8 @@ import {
   Sparkles,
   BookOpen,
   Command,
+  BrainCircuit,
+  Share2,
 } from "lucide-react";
 import { uploadPdf, pasteText, generateFromTopic } from "@/api/client";
 import type { DocumentUploadResponse } from "@/types";
@@ -21,6 +23,57 @@ interface DocumentUploadProps {
 
 type UploadStep = "upload" | "concepts" | "topic-only";
 
+function ProcessingView() {
+  const [step, setStep] = useState(0);
+
+  const steps = [
+    { text: "Reading document...", icon: FileText },
+    { text: "Analyzing structure...", icon: Sparkles },
+    { text: "Extracting concepts...", icon: BrainCircuit },
+    { text: "Building knowledge graph...", icon: Share2 },
+  ];
+
+  // Cycle through steps every 1.5s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStep((s) => (s < steps.length - 1 ? s + 1 : s));
+    }, 1500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const CurrentIcon = steps[step].icon;
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-6 animate-in fade-in duration-700">
+      <div className="relative">
+        <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full animate-pulse" />
+        <div className="relative w-24 h-24 bg-[#0a0a0f]/50 backdrop-blur-xl border border-white/10 rounded-3xl flex items-center justify-center shadow-2xl mb-8">
+          <CurrentIcon className="w-10 h-10 text-purple-400 animate-bounce" />
+        </div>
+      </div>
+
+      <h2 className="text-3xl font-bold text-white mb-4 tracking-tight">
+        {steps[step].text}
+      </h2>
+      <p className="text-slate-400 text-center max-w-sm mb-8 leading-relaxed">
+        Our AI is processing your content to generate an interactive causal
+        graph. This might take a moment.
+      </p>
+
+      <div className="flex gap-2">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className={`h-1.5 rounded-full transition-all duration-500 ${
+              i <= step ? "w-8 bg-purple-500" : "w-1.5 bg-white/10"
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [inputText, setInputText] = useState("");
@@ -29,8 +82,8 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
 
   // Two-step upload flow
   const [step, setStep] = useState<UploadStep>("upload");
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [pendingText, setPendingText] = useState<string | null>(null);
+  const [_pendingFile, setPendingFile] = useState<File | null>(null);
+  const [_pendingText, setPendingText] = useState<string | null>(null);
   const [focusConcepts, setFocusConcepts] = useState("");
 
   const handleProcess = async (
@@ -132,6 +185,14 @@ export function DocumentUpload({ onDocumentProcessed }: DocumentUploadProps) {
       handleFileUpload(file);
     }
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex flex-col h-full bg-transparent overflow-y-auto">
+        <ProcessingView />
+      </div>
+    );
+  }
 
   // Step 2: Concepts Input Screen (Only for "Learn Any Topic" mode now)
   if (step === "topic-only") {
