@@ -6,8 +6,9 @@ Uses Groq API for high-performance inference.
 import json
 import os
 from typing import Dict, Any, List
-from groq import Groq
+from groq import Groq, RateLimitError
 from config import get_settings
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 settings = get_settings()
 
@@ -228,8 +229,22 @@ Return your response as a JSON object."""
     print(full_text[:500] + "..." if len(full_text) > 500 else full_text)
     print("-" * 96)
 
+    @retry(
+        retry=retry_if_exception_type(RateLimitError),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(5)
+    )
+    def call_gemini_with_retry(messages, model, temperature, response_format):
+        print("Calling Groq API...")
+        return client.chat.completions.create(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            response_format=response_format
+        )
+
     try:
-        completion = client.chat.completions.create(
+        completion = call_gemini_with_retry(
             messages=[
                 {
                     "role": "system",
@@ -319,8 +334,14 @@ Return your response as a valid JSON object following the schema in the system p
 
     print(f"Starting TOPIC GENERATION for: {topics_str}")
 
-    try:
-        completion = client.chat.completions.create(
+    @retry(
+        retry=retry_if_exception_type(RateLimitError),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(5)
+    )
+    def call_topic_gen_with_retry():
+        print("Calling Groq API for topic generation...")
+        return client.chat.completions.create(
             messages=[
                 {
                     "role": "system",
@@ -332,9 +353,12 @@ Return your response as a valid JSON object following the schema in the system p
                 }
             ],
             model=model_name,
-            temperature=0.3,  # Slightly higher for more creative generation
+            temperature=0.3,
             response_format={"type": "json_object"}
         )
+
+    try:
+        completion = call_topic_gen_with_retry()
 
         response_content = completion.choices[0].message.content
         print(f"LLM Response received ({len(response_content)} chars)")
@@ -416,13 +440,21 @@ def chat_with_context(context: str, message: str, history: List[Dict[str, str]] 
     print(
         f"Starting Chat with context ({len(context)} chars) - Query: {message}")
 
-    try:
-        completion = client.chat.completions.create(
+    @retry(
+        retry=retry_if_exception_type(RateLimitError),
+        wait=wait_exponential(multiplier=1, min=4, max=60),
+        stop=stop_after_attempt(5)
+    )
+    def call_chat_with_retry():
+        return client.chat.completions.create(
             messages=messages,
             model=model_name,
             temperature=0.7,
             max_tokens=1000
         )
+
+    try:
+        completion = call_chat_with_retry()
 
         response = completion.choices[0].message.content
         print(f"Chat Response: {response[:100]}...")

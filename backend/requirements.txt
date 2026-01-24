@@ -12,3 +12,4 @@ authlib
 httpx
 groq
 gunicorn
+tenacity
