@@ -22,6 +22,7 @@ class DocumentBase(BaseModel):
     title: str
     source_type: Literal["pdf", "text"]
     raw_text: str
+    user_id: Optional[str] = None  # Owner of the document
 
 
 class DocumentCreate(DocumentBase):

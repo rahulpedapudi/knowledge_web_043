@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Body
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, Body, Depends
 from typing import Optional, List
 import json
 from bson import ObjectId
@@ -16,6 +16,7 @@ from models import (
 from services.pdf_extractor import extract_sentences_from_pdf, extract_sentences_from_text
 from services.llm_service import analyze_text_with_llm, generate_chat_title, generate_from_topics
 from services.mock_llm import DEMO_TEXT
+from auth import get_current_user_id, get_optional_user_id
 
 router = APIRouter()
 
@@ -25,7 +26,7 @@ class TopicGenerateRequest(BaseModel):
 
 
 @router.post("/generate", response_model=dict)
-async def generate_from_topic(request: TopicGenerateRequest):
+async def generate_from_topic(request: TopicGenerateRequest, user_id: str = Depends(get_current_user_id)):
     """Generate a knowledge graph from topics without a document."""
     if not request.topics or len(request.topics) == 0:
         raise HTTPException(
@@ -48,7 +49,8 @@ async def generate_from_topic(request: TopicGenerateRequest):
         "source_type": "generated",
         "raw_text": f"Generated knowledge graph for topics: {', '.join(topics)}",
         "focus_concepts": topics,
-        "processed": True
+        "processed": True,
+        "user_id": user_id  # Associate with authenticated user
     }
 
     result = await db.documents.insert_one(doc_data)
@@ -118,7 +120,8 @@ async def generate_from_topic(request: TopicGenerateRequest):
 async def upload_pdf(
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
-    focus_concepts: Optional[str] = Form(None)
+    focus_concepts: Optional[str] = Form(None),
+    user_id: str = Depends(get_current_user_id)
 ):
     """Upload a PDF file and extract causal relationships focused on specific concepts."""
     if not file.filename.endswith('.pdf'):
@@ -159,7 +162,8 @@ async def upload_pdf(
         "source_type": "pdf",
         "raw_text": raw_text,
         "focus_concepts": concepts_list,
-        "processed": False
+        "processed": False,
+        "user_id": user_id  # Associate with authenticated user
     }
 
     result = await db.documents.insert_one(doc_data)
@@ -246,7 +250,8 @@ async def upload_pdf(
 async def paste_text(
     text: str = Form(...),
     title: Optional[str] = Form("Pasted Text"),
-    focus_concepts: Optional[str] = Form(None)
+    focus_concepts: Optional[str] = Form(None),
+    user_id: str = Depends(get_current_user_id)
 ):
     """Submit pasted text and extract causal relationships focused on specific concepts."""
     if not text or len(text.strip()) < 20:
@@ -276,7 +281,8 @@ async def paste_text(
         "source_type": "text",
         "raw_text": text,
         "focus_concepts": concepts_list,
-        "processed": False
+        "processed": False,
+        "user_id": user_id  # Associate with authenticated user
     }
 
     result = await db.documents.insert_one(doc_data)
@@ -360,7 +366,7 @@ async def paste_text(
 
 
 @router.post("/demo", response_model=dict)
-async def create_demo():
+async def create_demo(user_id: str = Depends(get_optional_user_id)):
     """Create a demo document with pre-defined content."""
     db = get_database()
 
@@ -371,7 +377,8 @@ async def create_demo():
         "title": "Physics & Economics Demo",
         "source_type": "text",
         "raw_text": DEMO_TEXT,
-        "processed": False
+        "processed": False,
+        "user_id": user_id  # Optional - can be None for anonymous demo
     }
 
     result = await db.documents.insert_one(doc_data)
@@ -443,7 +450,7 @@ async def create_demo():
 
 
 @router.get("/{document_id}")
-async def get_document(document_id: str):
+async def get_document(document_id: str, user_id: str = Depends(get_current_user_id)):
     """Get document details by ID."""
     db = get_database()
 
@@ -454,13 +461,17 @@ async def get_document(document_id: str):
 
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Verify user owns this document
+    if doc.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied to this document")
 
     doc["_id"] = str(doc["_id"])
     return doc
 
 
 @router.get("/{document_id}/graph", response_model=GraphData)
-async def get_document_graph(document_id: str):
+async def get_document_graph(document_id: str, user_id: str = Depends(get_current_user_id)):
     """Get concepts and relationships for graph visualization."""
     db = get_database()
 
@@ -472,6 +483,10 @@ async def get_document_graph(document_id: str):
 
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Verify user owns this document
+    if doc.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied to this document")
 
     # Get concepts
     concepts_cursor = db.concepts.find({"document_id": document_id})
@@ -505,12 +520,12 @@ async def get_document_graph(document_id: str):
 
 
 @router.get("/", response_model=list)
-async def list_documents():
-    """List all documents."""
+async def list_documents(user_id: str = Depends(get_current_user_id)):
+    """List all documents for the authenticated user."""
     db = get_database()
 
     docs = []
-    cursor = db.documents.find().sort("_id", -1).limit(20)
+    cursor = db.documents.find({"user_id": user_id}).sort("_id", -1).limit(20)
     async for doc in cursor:
         docs.append({
             "id": str(doc["_id"]),

@@ -12,6 +12,7 @@ import re
 
 from database import get_database
 from services.llm_service import chat_with_context
+from auth import get_current_user_id
 
 router = APIRouter()
 
@@ -26,12 +27,27 @@ class ChatResponse(BaseModel):
     context_used: List[str]
 
 @router.post("/message", response_model=ChatResponse)
-async def chat_message(request: ChatRequest):
+async def chat_message(
+    request: ChatRequest,
+    user_id: str = Depends(get_current_user_id)
+):
     """
     Send a message to the chat assistant for a specific concept.
     Retrieves context chunks based on the concept label.
     """
     db = get_database()
+    
+    # Verify user owns the document
+    try:
+        document = await db.documents.find_one({"_id": ObjectId(request.document_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid document ID")
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    if document.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied to this document")
     
     # 1. Get Concept details to find its label
     try:
@@ -85,7 +101,7 @@ async def chat_message(request: ChatRequest):
         structured_context.append(f"Range: {', '.join(val_str)}")
 
     # Section: Causal Relationships
-    structured_context.append(f"\n### Causal Relationships for {concept_label}")
+    structured_context.append(f"\\n### Causal Relationships for {concept_label}")
     
     has_relations = False
     for rel in relationships:
@@ -111,7 +127,7 @@ async def chat_message(request: ChatRequest):
         structured_context.append("No direct causal relationships defined.")
 
     # 4. Find relevant chunks (Textual Context)
-    structured_context.append(f"\n### Source Document Excerpts for {concept_label}")
+    structured_context.append(f"\\n### Source Document Excerpts for {concept_label}")
     
     chunks_cursor = db.chunks.find({
         "document_id": request.document_id,
@@ -139,7 +155,7 @@ async def chat_message(request: ChatRequest):
             added_chunks.add(chunk)
 
     # Final Context String
-    context_str = "\n".join(structured_context)
+    context_str = "\\n".join(structured_context)
         
     # 5. Call LLM
     response = chat_with_context(
@@ -154,10 +170,19 @@ async def chat_message(request: ChatRequest):
     )
 
 @router.get("/history")
-async def get_chat_history():
-    """Get list of recent chat sessions (linked to documents)."""
+async def get_chat_history(user_id: str = Depends(get_current_user_id)):
+    """Get list of recent chat sessions for the authenticated user."""
     db = get_database()
-    cursor = db.chats.find().sort("created_at", -1).limit(50)
+    
+    # First get user's documents
+    user_docs_cursor = db.documents.find({"user_id": user_id})
+    user_doc_ids = [str(doc["_id"]) async for doc in user_docs_cursor]
+    
+    if not user_doc_ids:
+        return []
+    
+    # Then get chats for those documents
+    cursor = db.chats.find({"document_id": {"$in": user_doc_ids}}).sort("created_at", -1).limit(50)
     
     chats = []
     async for chat in cursor:
@@ -169,8 +194,9 @@ async def get_chat_history():
         })
     return chats
 
+
 @router.get("/{chat_id}")
-async def get_chat_session(chat_id: str):
+async def get_chat_session(chat_id: str, user_id: str = Depends(get_current_user_id)):
     """Get chat session details including linked document ID."""
     db = get_database()
     try:
@@ -180,6 +206,11 @@ async def get_chat_session(chat_id: str):
         
     if not chat:
         raise HTTPException(status_code=404, detail="Chat session not found")
+    
+    # Verify user owns the document linked to this chat
+    document = await db.documents.find_one({"_id": ObjectId(chat.get("document_id"))})
+    if not document or document.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied to this chat session")
         
     return {
         "id": str(chat["_id"]),
@@ -190,15 +221,22 @@ async def get_chat_session(chat_id: str):
     }
 
 @router.delete("/{chat_id}")
-async def delete_chat_session(chat_id: str):
+async def delete_chat_session(chat_id: str, user_id: str = Depends(get_current_user_id)):
     """Delete a chat session."""
     db = get_database()
     try:
-        result = await db.chats.delete_one({"_id": ObjectId(chat_id)})
+        chat = await db.chats.find_one({"_id": ObjectId(chat_id)})
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid chat ID")
-
-    if result.deleted_count == 0:
+    
+    if not chat:
         raise HTTPException(status_code=404, detail="Chat session not found")
-
+    
+    # Verify user owns the document linked to this chat
+    document = await db.documents.find_one({"_id": ObjectId(chat.get("document_id"))})
+    if not document or document.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied to this chat session")
+    
+    result = await db.chats.delete_one({"_id": ObjectId(chat_id)})
+    
     return {"status": "success", "message": "Chat session deleted"}
