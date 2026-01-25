@@ -144,7 +144,7 @@ export function Sidebar({ isCollapsed = false, onToggle }: SidebarProps) {
         <div className="p-2">
           <button
             onClick={onToggle}
-            className="w-full p-2 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+            className="w-full p-2 flex items-center justify-center text-white/70 hover:text-white border border-white/20 hover:border-white/60 bg-white/5 hover:bg-white/10 rounded-lg transition-all"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
@@ -216,7 +216,7 @@ export function Sidebar({ isCollapsed = false, onToggle }: SidebarProps) {
         </div>
         <button
           onClick={onToggle}
-          className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          className="p-2 text-white/70 hover:text-white border border-white/20 hover:border-white/60 bg-white/5 hover:bg-white/10 rounded-lg transition-all"
           title="Collapse sidebar"
         >
           <ChevronLeft className="w-4 h-4" />

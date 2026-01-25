@@ -375,10 +375,13 @@ def calculate_simulation(
 def generate_mock_topics(topics: list[str]) -> dict:
     """
     Generate a mock knowledge graph for topics when LLM is not available.
-    Creates a simple graph structure based on the input topics.
+    Creates a rich graph structure with multiple levels of depth and cross-connections.
     """
     concepts = []
     relationships = []
+    
+    # Track all concept IDs for cross-referencing
+    all_concept_ids = []
 
     # Create core concepts from topics
     for i, topic in enumerate(topics):
@@ -393,22 +396,24 @@ def generate_mock_topics(topics: list[str]) -> dict:
             "default_value": None,
             "abstraction_level": 8,
             "depth_level": 0,
+            "priority": 1,
             "category": "general",
             "semantic_type": "entity",
             "parent_concepts": []
         })
+        all_concept_ids.append(topic_id)
 
-        # Add some sub-concepts for each topic
-        sub_concepts = [
-            (f"{topic_id}_basics", f"{topic} Basics",
-             "Fundamental concepts and principles", 1),
-            (f"{topic_id}_applications", f"{topic} Applications",
-             "Practical applications and use cases", 1),
-            (f"{topic_id}_details", f"{topic} Details",
-             "Detailed information and specifics", 2),
+        # Level 1: Primary sub-concepts (direct children of topic)
+        level1_concepts = [
+            (f"{topic_id}_fundamentals", f"{topic} Fundamentals", "Core principles and foundational concepts"),
+            (f"{topic_id}_applications", f"{topic} Applications", "Practical applications and real-world use cases"),
+            (f"{topic_id}_techniques", f"{topic} Techniques", "Methods and approaches used"),
+            (f"{topic_id}_benefits", f"{topic} Benefits", "Key advantages and positive outcomes"),
+            (f"{topic_id}_challenges", f"{topic} Challenges", "Common obstacles and difficulties"),
         ]
 
-        for sub_id, sub_label, sub_desc, depth in sub_concepts:
+        level1_ids = []
+        for sub_id, sub_label, sub_desc in level1_concepts:
             concepts.append({
                 "id": sub_id,
                 "label": sub_label,
@@ -417,37 +422,137 @@ def generate_mock_topics(topics: list[str]) -> dict:
                 "min_value": None,
                 "max_value": None,
                 "default_value": None,
-                "abstraction_level": 5 - depth,
-                "depth_level": depth,
+                "abstraction_level": 5,
+                "depth_level": 1,
+                "priority": 2,
                 "category": "general",
                 "semantic_type": "entity",
                 "parent_concepts": [topic_id]
             })
+            all_concept_ids.append(sub_id)
+            level1_ids.append(sub_id)
 
             # Create relationship from parent to child
             relationships.append({
                 "source": topic_id,
                 "target": sub_id,
                 "type": "direct",
-                "description": f"{topic} includes {sub_label}",
+                "description": f"{topic} encompasses {sub_label}",
                 "equation": None,
                 "coefficient": 1.0
             })
 
-    # Connect topics if there are multiple
-    if len(topics) > 1:
-        for i in range(len(topics) - 1):
-            topic_id_1 = topics[i].lower().replace(" ", "_").replace("-", "_")
-            topic_id_2 = topics[i + 1].lower().replace(" ",
-                                                       "_").replace("-", "_")
+        # Level 2: Secondary sub-concepts (children of level 1)
+        level2_map = {
+            f"{topic_id}_fundamentals": [
+                (f"{topic_id}_theory", f"{topic} Theory", "Theoretical foundations"),
+                (f"{topic_id}_principles", f"{topic} Principles", "Guiding principles"),
+                (f"{topic_id}_history", f"{topic} History", "Historical development"),
+            ],
+            f"{topic_id}_applications": [
+                (f"{topic_id}_use_cases", f"{topic} Use Cases", "Specific use case examples"),
+                (f"{topic_id}_industry", f"{topic} in Industry", "Industry applications"),
+                (f"{topic_id}_examples", f"{topic} Examples", "Practical examples"),
+            ],
+            f"{topic_id}_techniques": [
+                (f"{topic_id}_methods", f"{topic} Methods", "Specific methodologies"),
+                (f"{topic_id}_tools", f"{topic} Tools", "Tools and resources"),
+                (f"{topic_id}_best_practices", f"{topic} Best Practices", "Recommended approaches"),
+            ],
+            f"{topic_id}_benefits": [
+                (f"{topic_id}_advantages", f"{topic} Advantages", "Key advantages"),
+                (f"{topic_id}_value", f"{topic} Value Proposition", "Value and impact"),
+            ],
+            f"{topic_id}_challenges": [
+                (f"{topic_id}_limitations", f"{topic} Limitations", "Known limitations"),
+                (f"{topic_id}_solutions", f"{topic} Solutions", "Solutions to challenges"),
+            ],
+        }
+
+        level2_ids = []
+        for parent_id, children in level2_map.items():
+            for child_id, child_label, child_desc in children:
+                concepts.append({
+                    "id": child_id,
+                    "label": child_label,
+                    "description": child_desc,
+                    "unit": None,
+                    "min_value": None,
+                    "max_value": None,
+                    "default_value": None,
+                    "abstraction_level": 3,
+                    "depth_level": 2,
+                    "priority": 3,
+                    "category": "general",
+                    "semantic_type": "entity",
+                    "parent_concepts": [parent_id]
+                })
+                all_concept_ids.append(child_id)
+                level2_ids.append(child_id)
+
+                # Create relationship from level 1 parent to level 2 child
+                relationships.append({
+                    "source": parent_id,
+                    "target": child_id,
+                    "type": "direct",
+                    "description": f"{parent_id.replace('_', ' ').title()} includes {child_label}",
+                    "equation": None,
+                    "coefficient": 1.0
+                })
+
+        # Cross-connect level 1 concepts (benefits relates to applications, etc.)
+        if len(level1_ids) >= 2:
+            # Connect benefits to applications
             relationships.append({
-                "source": topic_id_1,
-                "target": topic_id_2,
+                "source": f"{topic_id}_benefits",
+                "target": f"{topic_id}_applications",
                 "type": "direct",
-                "description": f"{topics[i]} relates to {topics[i + 1]}",
+                "description": f"Benefits drive {topic} Applications",
                 "equation": None,
-                "coefficient": 0.5
+                "coefficient": 0.7
             })
+            # Connect challenges to techniques (techniques solve challenges)
+            relationships.append({
+                "source": f"{topic_id}_techniques",
+                "target": f"{topic_id}_challenges",
+                "type": "direct",
+                "description": f"Techniques address {topic} Challenges",
+                "equation": None,
+                "coefficient": 0.6
+            })
+            # Connect fundamentals to techniques
+            relationships.append({
+                "source": f"{topic_id}_fundamentals",
+                "target": f"{topic_id}_techniques",
+                "type": "direct",
+                "description": f"Fundamentals underpin {topic} Techniques",
+                "equation": None,
+                "coefficient": 0.8
+            })
+
+    # Connect topics if there are multiple (bidirectional relationships)
+    if len(topics) > 1:
+        for i in range(len(topics)):
+            for j in range(i + 1, len(topics)):
+                topic_id_1 = topics[i].lower().replace(" ", "_").replace("-", "_")
+                topic_id_2 = topics[j].lower().replace(" ", "_").replace("-", "_")
+                relationships.append({
+                    "source": topic_id_1,
+                    "target": topic_id_2,
+                    "type": "direct",
+                    "description": f"{topics[i]} relates to {topics[j]}",
+                    "equation": None,
+                    "coefficient": 0.5
+                })
+                # Also connect their sub-concepts
+                relationships.append({
+                    "source": f"{topic_id_1}_applications",
+                    "target": f"{topic_id_2}_applications",
+                    "type": "direct",
+                    "description": f"{topics[i]} Applications connect with {topics[j]} Applications",
+                    "equation": None,
+                    "coefficient": 0.4
+                })
 
     return {
         "concepts": concepts,

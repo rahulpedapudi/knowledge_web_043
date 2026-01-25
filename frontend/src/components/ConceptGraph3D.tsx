@@ -24,6 +24,8 @@ import {
   Zap,
   Play,
   Pause,
+  Plus,
+  Minus,
 } from "lucide-react";
 
 // ============ Types ============
@@ -126,7 +128,7 @@ function ConnectionLine({
         start={start}
         end={end}
         mid={mid}
-        color={isActive ? "#ffffff" : color}
+        color={color}
         lineWidth={lineWidth || (isActive ? 3 : 1.5)}
         transparent
         opacity={opacity !== undefined ? opacity : isActive ? 1.0 : 0.7}
@@ -172,6 +174,8 @@ function NodeCard({
   node,
   isSelected,
   isHighlighted,
+  isExpanded,
+  hasChildren,
   onClick,
   calculatedPosition,
   onNodeDragStart,
@@ -182,6 +186,8 @@ function NodeCard({
   node: Node3D;
   isSelected: boolean;
   isHighlighted: boolean;
+  isExpanded: boolean;
+  hasChildren: boolean;
   onClick: () => void;
   calculatedPosition: [number, number, number];
   onNodeDragStart: () => void;
@@ -335,6 +341,25 @@ function NodeCard({
                     </div>
                   )}
               </div>
+
+              {/* Expand/Collapse indicator badge */}
+              {hasChildren && (
+                <div
+                  className={`
+                    absolute -bottom-2 -right-2 w-7 h-7 rounded-full
+                    flex items-center justify-center
+                    bg-gradient-to-br ${isExpanded ? 'from-rose-500 to-pink-600' : 'from-emerald-500 to-green-600'}
+                    border-2 border-white/30 shadow-lg
+                    transition-all duration-300
+                  `}
+                >
+                  {isExpanded ? (
+                    <Minus className="w-4 h-4 text-white" />
+                  ) : (
+                    <Plus className="w-4 h-4 text-white" />
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </Html>
@@ -346,16 +371,20 @@ function NodeCard({
 function Scene({
   nodes,
   edges,
+  allEdges,
   selectedNodeId,
   selectedEdgeId,
+  expandedNodeIds,
   onNodeClick,
   onEdgeClick,
   isPaused,
 }: {
   nodes: Node3D[];
   edges: any[];
+  allEdges: any[];
   selectedNodeId: string | null | undefined;
   selectedEdgeId: string | null | undefined;
+  expandedNodeIds: Set<string>;
   onNodeClick: (n: Node3D) => void;
   onEdgeClick: (e: D3Link) => void;
   isPaused: boolean;
@@ -407,48 +436,19 @@ function Scene({
         const isHovered = hoveredEdgeId === edge.id;
         const isSelected = selectedEdgeId === edge.id;
 
-        // Spotlight Logic
-        // 1. If a node is hovered, highlight its connections.
-        // 2. If NO node is hovered but a node is SELECTED, highlight its connections (Persistent Highlight).
-        // 3. Otherwise default state.
+        // Simple edge styling:
+        // - Hovered edge = cyan, thicker
+        // - All other edges = gray
+        
+        let opacity = 0.5; // All edges visible
+        let lineWidth = 1.5;
+        let color = "#6b7280"; // gray-500 for all edges
 
-        let opacity = 0.2; // Default "clean" state
-        let lineWidth = 1.0;
-
-        // Effective focus is hover if present, otherwise selection
-        const effectiveFocusId = hoveredNodeId || selectedNodeId;
-
-        if (effectiveFocusId) {
-          const isConnectedToFocus =
-            edge.source === effectiveFocusId ||
-            edge.target === effectiveFocusId;
-
-          if (isConnectedToFocus) {
-            opacity = 1.0; // Spotlight
-            lineWidth = 2.0;
-          } else {
-            // If dragging or just viewing, dim unconnected
-            opacity = 0.05;
-          }
-        }
-
-        // Edge specific hover/select overrides
-        if (isHovered || isSelected) {
+        // Only hovered edge gets special treatment
+        if (isHovered) {
+          color = "#22d3ee"; // cyan-400
           opacity = 1.0;
-          lineWidth = 2.0;
-        }
-
-        // Brighter default edge color for dark background (kept from previous tweak)
-        let color = "#94a3b8"; // slate-400
-        if (target.variant === "vibrant" || source.variant === "vibrant")
-          color = "#c084fc"; // purple-400 (brighter)
-
-        if (isHovered || isSelected) color = "#ffffff";
-        else if (
-          effectiveFocusId &&
-          (edge.source === effectiveFocusId || edge.target === effectiveFocusId)
-        ) {
-          color = "#ffffff"; // Also white/bright for spotlighted edges
+          lineWidth = 3.0;
         }
 
         return (
@@ -467,25 +467,35 @@ function Scene({
         );
       })}
 
-      {nodes.map((node) => (
-        <NodeCard
-          key={node.id}
-          node={node}
-          isSelected={node.id === selectedNodeId}
-          isHighlighted={
-            highlightSet.has(node.id) ||
-            (hoveredNodeId !== null && hoveredNodeId === node.id)
-          } // Highlight hovered node too
-          onClick={() => onNodeClick(node)}
-          calculatedPosition={node.position}
-          onNodeDragStart={() => {
-            /* Optional: Pause rotation while dragging */
-          }}
-          onNodeDragEnd={() => {}}
-          onPointerOver={() => setHoveredNodeId(node.id)}
-          onPointerOut={() => setHoveredNodeId(null)}
-        />
-      ))}
+      {nodes.map((node) => {
+        // Calculate if this node has expandable children (connected nodes that aren't currently visible)
+        // Check against ALL relationships, not just visible ones
+        const hasChildren = allEdges.some(
+          (e: any) =>
+            (e.source === node.id || e.target === node.id)
+        );
+        const isExpanded = expandedNodeIds.has(node.id);
+
+        return (
+          <NodeCard
+            key={node.id}
+            node={node}
+            isSelected={node.id === selectedNodeId}
+            isHighlighted={
+              highlightSet.has(node.id) ||
+              (hoveredNodeId !== null && hoveredNodeId === node.id)
+            }
+            isExpanded={isExpanded}
+            hasChildren={hasChildren}
+            onClick={() => onNodeClick(node)}
+            calculatedPosition={node.position}
+            onNodeDragStart={() => {}}
+            onNodeDragEnd={() => {}}
+            onPointerOver={() => setHoveredNodeId(node.id)}
+            onPointerOut={() => setHoveredNodeId(null)}
+          />
+        );
+      })}
     </group>
   );
 }
@@ -509,39 +519,74 @@ export function ConceptGraph3D({
   const [initialNodeIds, setInitialNodeIds] = useState<Set<string>>(new Set());
 
   // Reset expansion and calculate INITIAL view when graph data changes
+  // HIERARCHICAL: Show ONLY the root/center node initially
+  // All other nodes appear when their parent is expanded
   useEffect(() => {
     setExpandedNodeIds(new Set());
 
-    // Calculate initial visible set ONCE
     const ids = new Set<string>();
-    graphData.concepts.forEach((node) => {
-      // User Request: Only show up to Priority 3
-      if (node.priority !== undefined && node.priority > 3) return;
+    
+    if (!graphData.concepts || graphData.concepts.length === 0) {
+      setInitialNodeIds(ids);
+      return;
+    }
 
-      const isPriority1 = node.priority === 1;
-      const isCore = (node.depth_level ?? 0) === 0;
-      // Fallback for legacy: priority undefined AND depth 1
-      const isLegacyPrimary =
-        node.priority === undefined && node.depth_level === 1;
+    // Find THE root node (single center node)
+    // Priority: depth_level 0 > priority 1 > first source-only node > first node
+    const rootNodes = graphData.concepts.filter((c) => c.depth_level === 0);
+    let root = rootNodes.length > 0 ? rootNodes[0] : null;
+    
+    if (!root) {
+      const priorityNodes = graphData.concepts.filter((c) => c.priority === 1);
+      root = priorityNodes.length > 0 ? priorityNodes[0] : null;
+    }
+    
+    if (!root) {
+      // Find nodes that are sources but never targets
+      const allTargets = new Set<string>();
+      graphData.relationships.forEach((rel) => allTargets.add(rel.target));
+      const sourceOnly = graphData.concepts.find((c) => !allTargets.has(c.id));
+      root = sourceOnly || graphData.concepts[0];
+    }
 
-      if (isPriority1 || isCore || isLegacyPrimary) {
-        ids.add(node.id);
-      }
-    });
-
-    // Safety Fallback: If nothing is visible, show top 5 concepts
-    if (ids.size === 0 && graphData.concepts.length > 0) {
-      graphData.concepts.slice(0, 5).forEach((c) => ids.add(c.id));
+    if (root) {
+      ids.add(root.id);
+      console.log("Root node:", root.label, root.id);
     }
 
     setInitialNodeIds(ids);
   }, [graphData]);
 
-  // Handle local node click for expansion + prop callback
+  // Handle local node click for expansion + prop callback (TOGGLE)
+  // Cascading collapse: when collapsing a node, also collapse all its descendants
   const handleNodeClick = (node: ConceptNode) => {
-    // Expand this node
     const newExpanded = new Set(expandedNodeIds);
-    newExpanded.add(node.id);
+    
+    if (newExpanded.has(node.id)) {
+      // COLLAPSE: Remove this node AND all its descendants from expanded set
+      newExpanded.delete(node.id);
+      
+      // Find all descendants using BFS through relationships
+      const toRemove = new Set<string>();
+      const queue = [node.id];
+      
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        // Find all children (nodes where current is source)
+        graphData.relationships.forEach((rel) => {
+          if (rel.source === currentId && !toRemove.has(rel.target)) {
+            toRemove.add(rel.target);
+            queue.push(rel.target);
+            // Also remove from expanded if it was expanded
+            newExpanded.delete(rel.target);
+          }
+        });
+      }
+    } else {
+      // EXPAND: Just add this node
+      newExpanded.add(node.id);
+    }
+    
     setExpandedNodeIds(newExpanded);
 
     // Call original handler
@@ -551,13 +596,31 @@ export function ConceptGraph3D({
   // 1. STABLE LAYOUT ALGORITHM (Positions dependent ONLY on graphData)
   const layoutNodes = useMemo(() => {
     const nodes: Node3D[] = [];
+    const processedIds = new Set<string>();
 
     // Use all nodes for layout to ensure stability
     const allConcepts = graphData.concepts;
-    const rootNodes = allConcepts.filter((c) => (c.depth_level ?? 0) === 0);
-    const root = rootNodes.length > 0 ? rootNodes[0] : allConcepts[0];
-
-    if (!root) return [];
+    
+    if (allConcepts.length === 0) return [];
+    
+    // Find THE root node using same logic as initialNodeIds
+    // Priority: explicit depth_level 0 > priority 1 > source-only node > first
+    let root = allConcepts.find((c) => c.depth_level === 0);
+    
+    if (!root) {
+      root = allConcepts.find((c) => c.priority === 1);
+    }
+    
+    if (!root) {
+      // Find node that is source but never target (true root)
+      const allTargets = new Set<string>();
+      graphData.relationships.forEach((rel) => allTargets.add(rel.target));
+      root = allConcepts.find((c) => !allTargets.has(c.id));
+    }
+    
+    if (!root) {
+      root = allConcepts[0];
+    }
 
     nodes.push({
       ...root,
@@ -568,8 +631,9 @@ export function ConceptGraph3D({
       side: "center",
       variant: "glass",
     });
+    processedIds.add(root.id);
 
-    const remainders = allConcepts.filter((c) => c.id !== root.id);
+    const remainders = allConcepts.filter((c) => c.id !== root!.id);
 
     const innerOrbitNodes: ConceptNode[] = [];
     const outerOrbitNodes: ConceptNode[] = [];
@@ -597,6 +661,10 @@ export function ConceptGraph3D({
     const innerStep = (Math.PI * 2) / Math.max(1, innerOrbitNodes.length);
 
     innerOrbitNodes.forEach((node, i) => {
+      // Skip if already processed
+      if (processedIds.has(node.id)) return;
+      processedIds.add(node.id);
+      
       const angle = i * innerStep;
       // Size based on importance
       let size = 0.8;
@@ -626,6 +694,10 @@ export function ConceptGraph3D({
     const outerStep = (Math.PI * 2) / Math.max(1, outerOrbitNodes.length);
 
     outerOrbitNodes.forEach((node, i) => {
+      // Skip if already processed
+      if (processedIds.has(node.id)) return;
+      processedIds.add(node.id);
+      
       const angle = i * outerStep + Math.PI / 4;
       const y = Math.sin(angle * 2) * 8;
 
@@ -653,22 +725,26 @@ export function ConceptGraph3D({
     return nodes;
   }, [graphData]);
 
+  console.log("Layout nodes created:", layoutNodes.length, "Total concepts:", graphData.concepts.length, "Unique IDs:", new Set(layoutNodes.map(n => n.id)).size);
+
   // 2. VISIBILITY FILTERING (Depends on layout + expanded state)
+  // Only show direct neighbors of expanded nodes, not all transitively connected nodes
   const { nodes3D, edges3D } = useMemo(() => {
     // Determine which IDs are visible
-    // Start with the INITIAL set (so they don't disappear)
+    // Start with the INITIAL set (core/root nodes)
     const visibleNodeIds = new Set<string>(initialNodeIds);
 
-    // Add neighbors of expanded nodes
+    // Add DIRECT neighbors of expanded nodes (Level 2)
+    // For each expanded node, find all nodes connected via relationships
+    // and add them to visible set
     expandedNodeIds.forEach((expandedId) => {
-      // Find all edges connected to this expanded node
+      // Find all edges directly connected to this expanded node
       graphData.relationships.forEach((rel) => {
         let neighborId = null;
         if (rel.source === expandedId) neighborId = rel.target;
         if (rel.target === expandedId) neighborId = rel.source;
 
         if (neighborId) {
-          // Allow revealing ANY neighbor on click (Deep Dive)
           visibleNodeIds.add(neighborId);
         }
       });
@@ -677,6 +753,8 @@ export function ConceptGraph3D({
     // Filter the PRE-CALCULATED layoutNodes
     const visibleNodes = layoutNodes.filter((n) => visibleNodeIds.has(n.id));
 
+    // Only show edges between currently visible nodes
+    // This prevents showing relationships to nodes that aren't visible
     const visibleEdges = graphData.relationships.filter(
       (e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target),
     );
@@ -701,8 +779,10 @@ export function ConceptGraph3D({
         <Scene
           nodes={nodes3D}
           edges={edges3D}
+          allEdges={graphData.relationships}
           selectedNodeId={selectedNodeId}
           selectedEdgeId={selectedEdgeId}
+          expandedNodeIds={expandedNodeIds}
           onNodeClick={handleNodeClick}
           onEdgeClick={onEdgeSelect}
           isPaused={isPaused}
