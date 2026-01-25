@@ -140,6 +140,15 @@ class GraphData(BaseModel):
 
 # ============ Simulation Models ============
 
+# ============ Simulation Models ============
+
+class SimulationFeedback(BaseModel):
+    min_value: float
+    max_value: float
+    feedback_text: str
+    sentiment: Literal["positive", "neutral", "negative", "warning"] = "neutral"
+
+
 class SimulationConfig(BaseModel):
     relationship_id: str
     source_concept: ConceptNode
@@ -147,6 +156,11 @@ class SimulationConfig(BaseModel):
     relationship_type: Literal["direct", "inverse"]
     equation: Optional[str] = None
     coefficient: float = 1.0
+    # New Pedagogical Fields
+    scenario_context: Optional[str] = None
+    variable_explainer: Optional[str] = None
+    feedback_rules: Optional[list[SimulationFeedback]] = None
+    visual_theme: Optional[str] = "default"  # e.g., "financial", "physics", "biological"
 
 
 class SimulationRequest(BaseModel):

@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
-import { Activity, Minus, TrendingUp, TrendingDown } from "lucide-react";
-import type { ConceptNode, RelationshipEdge } from "@/types";
+import { Activity, Minus, Loader2 } from "lucide-react";
+import type { ConceptNode, RelationshipEdge, SimulationConfig } from "@/types";
+import { getSimulationConfig, calculateSimulation } from "@/api/client";
+import { SimulationFallback } from "./SimulationFallback";
+import { ActiveSimulation } from "./ActiveSimulation";
 
 interface SimulationPanelProps {
   selectedNode: ConceptNode | null;
@@ -11,13 +14,36 @@ interface SimulationPanelProps {
 }
 
 export function SimulationPanel({
-  // selectedNode,
   selectedEdge,
   sourceNode,
   targetNode,
   onClose,
 }: SimulationPanelProps) {
-  // If no edge is selected, show placeholder
+  const [config, setConfig] = useState<SimulationConfig | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (selectedEdge) {
+      loadConfig(selectedEdge.id);
+    }
+  }, [selectedEdge]);
+
+  const loadConfig = async (edgeId: string) => {
+    setIsLoading(true);
+    setError(false);
+    setConfig(null);
+    try {
+      const data = await getSimulationConfig(edgeId);
+      setConfig(data);
+    } catch (err) {
+      console.error("Failed to load simulation config:", err);
+      setError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (!selectedEdge) {
     return (
       <div className="h-full flex flex-col p-6">
@@ -41,181 +67,49 @@ export function SimulationPanel({
     );
   }
 
-  return (
-    <ActiveSimulation
-      state={{ edge: selectedEdge, source: sourceNode, target: targetNode }}
-      onClose={onClose}
-    />
-  );
-}
-
-import { calculateSimulation } from "@/api/client";
-
-function ActiveSimulation({
-  state,
-  onClose,
-}: {
-  state: {
-    edge: RelationshipEdge;
-    source?: ConceptNode | null;
-    target?: ConceptNode | null;
-  };
-  onClose: () => void;
-}) {
-  const { edge, source, target } = state;
-
-  const [inputValue, setInputValue] = useState(50);
-  const [outputValue, setOutputValue] = useState(50);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
-
-  // Debounce logic to prevent flooding API
-  useEffect(() => {
-    setIsAnimating(true);
-    setIsCalculating(true);
-
-    // Stop animation after short delay
-    const animTimer = setTimeout(() => setIsAnimating(false), 500);
-
-    // Call API with debounce
-    const apiTimer = setTimeout(async () => {
-      try {
-        const result = await calculateSimulation(edge.id, inputValue);
-        setOutputValue(result.output_value);
-      } catch (err) {
-        console.error("Simulation failed:", err);
-      } finally {
-        setIsCalculating(false);
-      }
-    }, 300); // 300ms debounce
-
-    return () => {
-      clearTimeout(animTimer);
-      clearTimeout(apiTimer);
-    };
-  }, [inputValue, edge.id]);
-
-  return (
-    <div className="h-full flex flex-col p-6 animate-in fade-in slide-in-from-right-4 duration-300">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex flex-col">
+  // Loading State
+  if (isLoading) {
+    return (
+      <div className="h-full flex flex-col p-6">
+        <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
             <Activity className="w-5 h-5 text-blue-400" />
-            Live Simulation
+            Simulation
           </h3>
-          <span className="text-xs text-slate-500 uppercase tracking-wider font-medium mt-1">
-            AI-Powered Analysis
-          </span>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
+            <Minus className="w-5 h-5" />
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-white">
-          <Minus className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Visual Flow */}
-      <div className="flex-1 flex flex-col gap-6">
-        {/* Source Input */}
-        <div className="bg-slate-800/40 rounded-xl p-5 border border-blue-500/20 shadow-[0_4px_20px_rgba(59,130,246,0.05)] transition-all hover:border-blue-500/40">
-          <div className="flex justify-between text-sm text-slate-400 mb-2">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
-              CAUSE (Input)
-            </span>
-            <span className="text-blue-400 font-mono font-bold">
-              {inputValue}
-              {source?.unit ? ` ${source.unit}` : "%"}
-            </span>
-          </div>
-          <div
-            className="text-xl font-bold text-white mb-1 truncate"
-            title={source?.label}>
-            {source?.label || "Source Node"}
-          </div>
-          <div className="text-xs text-slate-500 mb-5 uppercase tracking-wider">
-            {source?.semantic_type || "Variable"}
-          </div>
-
-          <input
-            type="range"
-            min={source?.min_value ?? 0}
-            max={source?.max_value ?? 100}
-            value={inputValue}
-            onChange={(e) => setInputValue(parseFloat(e.target.value))}
-            className="w-full h-2 bg-slate-700/50 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400 transition-colors"
-          />
-          <div className="flex justify-between text-[10px] uppercase font-bold text-slate-600 mt-2">
-            <span>Min</span>
-            <span>Max</span>
-          </div>
-        </div>
-
-        {/* Connection Visual */}
-        <div className="flex flex-col items-center justify-center gap-1 text-slate-500 py-2 relative">
-          {/* Animated flow line */}
-          <div className="absolute top-0 bottom-0 w-[2px] bg-slate-800 -z-10"></div>
-          <div
-            className={`absolute top-0 bottom-0 w-[2px] bg-gradient-to-b from-blue-500 to-purple-500 -z-10 transition-opacity duration-300 ${isAnimating ? "opacity-100" : "opacity-30"}`}></div>
-
-          <div className="bg-[#050510] border border-white/10 px-3 py-1.5 rounded-full flex items-center gap-2 shadow-xl z-10">
-            {edge.relationship_type === "direct" ? (
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
-            ) : edge.relationship_type === "inverse" ? (
-              <TrendingDown className="w-4 h-4 text-rose-400" />
-            ) : (
-              <Activity className="w-4 h-4 text-amber-400" />
-            )}
-            <span className="text-xs uppercase tracking-wider font-bold text-slate-300">
-              {edge.relationship_type} Relation
-            </span>
-          </div>
-          {edge.equation && (
-            <div className="text-[10px] text-slate-500 max-w-[240px] text-center bg-[#050510]/80 backdrop-blur px-2 py-1 rounded font-mono mt-1">
-              Eq: {edge.equation}
-            </div>
-          )}
-        </div>
-
-        {/* Target Output */}
-        <div className="bg-slate-800/40 rounded-xl p-5 border border-purple-500/20 shadow-[0_4px_20px_rgba(168,85,247,0.05)] transition-all hover:border-purple-500/40">
-          <div className="flex justify-between text-sm text-slate-400 mb-2">
-            <span className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"></span>
-              EFFECT (Output)
-            </span>
-            <span
-              className={`text-purple-400 font-mono font-bold transition-all duration-300 ${isCalculating ? "opacity-50 blur-sm" : "opacity-100"}`}
-              style={{ transform: isAnimating ? "scale(1.1)" : "scale(1)" }}>
-              {outputValue.toFixed(1)}
-              {target?.unit ? ` ${target.unit}` : "%"}
-            </span>
-          </div>
-          <div
-            className="text-xl font-bold text-white mb-1 truncate"
-            title={target?.label}>
-            {target?.label || "Target Node"}
-          </div>
-          <div className="text-xs text-slate-500 mb-5 uppercase tracking-wider">
-            {target?.semantic_type || "Outcome"}
-          </div>
-
-          {/* Visual Bar */}
-          <div className="h-4 bg-slate-900/50 rounded-full overflow-hidden border border-white/5 relative">
-            {/* Grid lines */}
-            <div className="absolute inset-0 flex justify-between px-2">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="w-[1px] h-full bg-white/5"></div>
-              ))}
-            </div>
-            {/* Use a relative width based on min/max of the target if available, else 0-100 clamp */}
-            <div
-              className="h-full bg-gradient-to-r from-purple-600 to-pink-500 transition-all duration-500 ease-out shadow-[0_0_15px_rgba(236,72,153,0.5)]"
-              style={{ width: `${Math.min(100, Math.max(0, outputValue))}%` }}
-            />
-          </div>
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <Loader2 className="w-10 h-10 text-purple-500 animate-spin mb-4" />
+          <p className="text-slate-300 font-medium">Initializing Model...</p>
+          <p className="text-xs text-slate-500 mt-2">Generating parameters with AI</p>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  // Fallback Logic: If no config, error, or no equation -> specific fallback UI
+  if (error || !config || !config.equation) {
+    return (
+      <SimulationFallback
+        edge={selectedEdge}
+        source={sourceNode}
+        target={targetNode}
+        onClose={onClose}
+      />
+    );
+  }
+
+  // Active Simulation
+  return (
+    <ActiveSimulation
+      // Use config data if available, falling back to props
+      source={config.source_concept || sourceNode}
+      target={config.target_concept || targetNode}
+      edge={selectedEdge}
+      equation={config.equation}
+      onClose={onClose}
+    />
   );
 }

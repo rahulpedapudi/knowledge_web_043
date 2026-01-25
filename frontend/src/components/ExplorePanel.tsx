@@ -5,8 +5,8 @@ import {
   BrainCircuit,
   ArrowLeft,
   Share2,
-  // Activity,
   Info,
+  ChevronRight
 } from "lucide-react";
 import { SimulationPanel } from "./SimulationPanel";
 import { QuizDialog } from "./QuizDialog";
@@ -23,7 +23,7 @@ interface ExplorePanelProps {
   onClose: () => void;
 }
 
-type ExploreView = "menu" | "quiz" | "flashcards" | "simulation";
+type ExploreView = "menu" | "quiz" | "flashcards" | "simulation" | "simulation_select";
 
 export function ExplorePanel({
   documentId,
@@ -35,10 +35,63 @@ export function ExplorePanel({
   onClose,
 }: ExplorePanelProps) {
   const [view, setView] = useState<ExploreView>("menu");
+  const [tempEdge, setTempEdge] = useState<RelationshipEdge | null>(null);
+  const [tempSource, setTempSource] = useState<ConceptNode | null>(null);
+  const [tempTarget, setTempTarget] = useState<ConceptNode | null>(null);
 
-  const goBack = () => setView("menu");
+  const goBack = () => {
+    setView("menu");
+    setTempEdge(null);
+  };
+
+  const handleSimulationStart = () => {
+    if (selectedEdge) {
+      setView("simulation");
+      return;
+    }
+
+    if (selectedNode && neighbors.length > 0) {
+      if (neighbors.length === 1) {
+        // Auto-select the only neighbor
+        const { node: otherNode, relationship } = neighbors[0];
+        setTempEdge(relationship);
+
+        // Determine source/target
+        // If selectedNode is source
+        if (relationship.source === selectedNode.id) {
+          setTempSource(selectedNode);
+          setTempTarget(otherNode);
+        } else {
+          setTempSource(otherNode);
+          setTempTarget(selectedNode);
+        }
+
+        setView("simulation");
+      } else {
+        // Show selection menu
+        setView("simulation_select");
+      }
+    }
+  };
+
+  const handleNeighborSelect = (neighbor: { node: ConceptNode; relationship: RelationshipEdge }) => {
+    setTempEdge(neighbor.relationship);
+    if (neighbor.relationship.source === selectedNode?.id) {
+      setTempSource(selectedNode);
+      setTempTarget(neighbor.node);
+    } else {
+      setTempSource(neighbor.node);
+      setTempTarget(selectedNode!);
+    }
+    setView("simulation");
+  }
 
   if (view === "simulation") {
+    // Use either the directly selected edge/nodes OR the temporary ones selected from the menu
+    const activeEdge = selectedEdge || tempEdge;
+    const activeSource = sourceNode || tempSource;
+    const activeTarget = targetNode || tempTarget;
+
     return (
       <div className="h-full flex flex-col">
         <div className="p-2 border-b border-slate-700/50 flex items-center gap-2">
@@ -53,15 +106,59 @@ export function ExplorePanel({
         </div>
         <div className="flex-1 overflow-hidden">
           <SimulationPanel
+            selectedEdge={activeEdge}
             selectedNode={selectedNode}
-            selectedEdge={selectedEdge}
-            sourceNode={sourceNode}
-            targetNode={targetNode}
+            sourceNode={activeSource}
+            targetNode={activeTarget}
             onClose={onClose}
           />
         </div>
       </div>
     );
+  }
+
+  if (view === "simulation_select") {
+    return (
+      <div className="h-full flex flex-col">
+        <div className="p-2 border-b border-slate-700/50 flex items-center gap-2">
+          <button
+            onClick={goBack}
+            className="p-1 hover:bg-slate-700/50 rounded-lg text-slate-400 hover:text-white transition-colors">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <span className="text-sm font-medium text-slate-300">
+            Select Simulation
+          </span>
+        </div>
+        <div className="p-4 overflow-y-auto">
+          <p className="text-sm text-slate-400 mb-4">
+            Which relationship do you want to simulate?
+          </p>
+          <div className="flex flex-col gap-3">
+            {neighbors.map((neighbor) => (
+              <div
+                key={neighbor.relationship.id}
+                onClick={() => handleNeighborSelect(neighbor)}
+                className="p-4 bg-slate-800/40 border border-white/5 rounded-xl hover:bg-slate-700/50 hover:border-blue-500/30 cursor-pointer transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    {neighbor.relationship.relationship_type}
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-blue-400" />
+                </div>
+                <div className="text-sm text-white font-medium mt-1">
+                  {selectedNode?.label} → {neighbor.node.label}
+                </div>
+                <div className="text-xs text-slate-400 mt-2 line-clamp-2">
+                  {neighbor.relationship.description}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (view === "quiz" && selectedNode && documentId) {
@@ -107,12 +204,6 @@ export function ExplorePanel({
 
           {/* Metadata */}
           <div className="flex gap-2">
-            {/* <div className="bg-slate-800/50 px-3 py-2 rounded-lg border border-white/5">
-              <div className="text-[10px] text-slate-500 uppercase">Type</div>
-              <div className="text-xs font-mono text-blue-300">
-                {selectedNode.semantic_type || "Entity"}
-              </div>
-            </div> */}
             {selectedNode.unit && (
               <div className="bg-slate-800/50 px-3 py-2 rounded-lg border border-white/5">
                 <div className="text-[10px] text-slate-500 uppercase">Unit</div>
@@ -218,10 +309,10 @@ export function ExplorePanel({
 
         {/* Simulation Card */}
         <div
-          onClick={() => selectedEdge && setView("simulation")}
-          className={`p-4 rounded-xl border transition-all cursor-pointer ${selectedEdge?.has_simulation
-            ? "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 hover:border-blue-500/30"
-            : "bg-slate-800/30 border-slate-700/30 opacity-50 cursor-not-allowed"
+          onClick={handleSimulationStart}
+          className={`p-4 rounded-xl border transition-all cursor-pointer ${selectedEdge || (selectedNode && neighbors.length > 0)
+              ? "bg-slate-700/30 border-slate-600/50 hover:bg-slate-700/50 hover:border-blue-500/30"
+              : "bg-slate-800/30 border-slate-700/30 opacity-50 cursor-not-allowed"
             }`}>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
@@ -232,9 +323,11 @@ export function ExplorePanel({
                 Live Simulation
               </h3>
               <p className="text-xs text-slate-500">
-                {selectedEdge?.has_simulation
+                {selectedEdge
                   ? "Run interactive sim"
-                  : "Select a relationship"}
+                  : selectedNode && neighbors.length > 0
+                    ? "Simulate relationship"
+                    : "Select a connected node"}
               </p>
             </div>
           </div>

@@ -19,14 +19,27 @@ export interface ConceptNode {
 
 // ============ Relationship Types ============
 
+export interface SimulationFeedback {
+  min_value: number;
+  max_value: number;
+  feedback_text: string;
+  sentiment: 'positive' | 'neutral' | 'negative' | 'warning';
+}
+
 export interface RelationshipEdge {
   id: string;
   source: string;
   target: string;
-  relationship_type: "direct" | "inverse";
+  relationship_type: "direct" | "inverse" | string;
   description: string;
   equation?: string;
-  has_simulation: boolean;
+  has_simulation?: boolean;
+
+  // Pedagogical Fields
+  scenario_context?: string;
+  variable_explainer?: string;
+  feedback_rules?: SimulationFeedback[];
+  visual_theme?: string;
 }
 
 // ============ Graph Data ============
@@ -64,6 +77,10 @@ export interface SimulationConfig {
   relationship_type: "direct" | "inverse";
   equation?: string;
   coefficient: number;
+  scenario_context?: string;
+  variable_explainer?: string;
+  feedback_rules?: SimulationFeedback[];
+  visual_theme?: string;
 }
 
 export interface SimulationResult {
