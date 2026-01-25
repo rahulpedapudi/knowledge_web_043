@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowRight, Check, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { login, signup, getGoogleOAuthUrl } from "@/api/client";
 import { useAuth } from "@/context/AuthContext";
 
