@@ -373,7 +373,7 @@ function Scene({
   useFrame((_state, delta) => {
     if (!selectedNodeId && !selectedEdgeId && !isPaused) {
       if (groupRef.current) {
-        groupRef.current.rotation.y += delta * 0.15;
+        groupRef.current.rotation.y += delta * 0.05;
       }
     }
   });
